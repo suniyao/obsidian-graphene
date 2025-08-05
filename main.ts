@@ -89,6 +89,8 @@ export default class CombinedPlugin extends Plugin {
         }
     }
 
+    // Update the updateEmbeddingStatusUI method:
+
     updateEmbeddingStatusUI(): void {
         if (!this.embeddingStatusEl) return;
         
@@ -98,30 +100,81 @@ export default class CombinedPlugin extends Plugin {
         
         const statusContainer = this.embeddingStatusEl.createDiv('embedding-status-container');
         
-        statusContainer.createEl('h4', { text: 'Embedding Status' });
+        // Calculate percentages
+        const embeddedFiles = stats.upToDate;
+        const percentage = Math.round((embeddedFiles / stats.total) * 100);
+        const needsUpdate = stats.modified + stats.new;
         
-        const statusList = statusContainer.createDiv('status-list');
+        // Status text
+        const statusText = statusContainer.createEl('p', {
+            text: `${embeddedFiles} of ${stats.total} files have embeddings`,
+            cls: 'setting-item-description'
+        });
         
-        this.createStatusItem(statusList, 'Total files', stats.total, 'default');
-        this.createStatusItem(statusList, 'Up to date', stats.upToDate, 'success');
-        
-        if (stats.modified > 0) {
-            this.createStatusItem(statusList, 'Modified', stats.modified, 'warning');
+        // Add indicator for files needing update
+        if (needsUpdate > 0) {
+            const updateText = needsUpdate === 1 
+                ? '1 file needs update' 
+                : `${needsUpdate} files need update`;
+            
+            statusText.innerHTML += ` <span class="embedding-status-warning">(${updateText})</span>`;
         }
         
-        if (stats.new > 0) {
-            this.createStatusItem(statusList, 'New', stats.new, 'info');
+        // Progress bar
+        const progressBar = statusContainer.createDiv('embedding-progress');
+        const progressFill = progressBar.createDiv('embedding-progress-fill');
+        progressFill.style.width = `${percentage}%`;
+        
+        // Show segments for different statuses
+        if (stats.total > 0) {
+            const upToDateWidth = (stats.upToDate / stats.total) * 100;
+            const modifiedWidth = (stats.modified / stats.total) * 100;
+            const newWidth = (stats.new / stats.total) * 100;
+            
+            progressBar.empty();
+            
+            // Up to date segment (green)
+            if (stats.upToDate > 0) {
+                const upToDateSegment = progressBar.createDiv('progress-segment progress-up-to-date');
+                upToDateSegment.style.width = `${upToDateWidth}%`;
+            }
+            
+            // Modified segment (yellow)
+            if (stats.modified > 0) {
+                const modifiedSegment = progressBar.createDiv('progress-segment progress-modified');
+                modifiedSegment.style.width = `${modifiedWidth}%`;
+            }
+            
+            // New segment (blue)
+            if (stats.new > 0) {
+                const newSegment = progressBar.createDiv('progress-segment progress-new');
+                newSegment.style.width = `${newWidth}%`;
+            }
         }
         
-        if (stats.processing > 0) {
-            this.createStatusItem(statusList, 'Processing', stats.processing, 'processing');
+        // Legend
+        if (needsUpdate > 0) {
+            const legend = statusContainer.createDiv('embedding-legend');
+            
+            const legendItems = [];
+            if (stats.upToDate > 0) {
+                legendItems.push(`<span class="legend-item"><span class="legend-color legend-up-to-date"></span>Up to date (${stats.upToDate})</span>`);
+            }
+            if (stats.modified > 0) {
+                legendItems.push(`<span class="legend-item"><span class="legend-color legend-modified"></span>Modified (${stats.modified})</span>`);
+            }
+            if (stats.new > 0) {
+                legendItems.push(`<span class="legend-item"><span class="legend-color legend-new"></span>New (${stats.new})</span>`);
+            }
+            
+            legend.innerHTML = legendItems.join('');
         }
         
-        // Add update button if needed
-        if (stats.modified > 0 || stats.new > 0) {
+        // Update button if needed
+        if (needsUpdate > 0) {
             const buttonContainer = statusContainer.createDiv('button-container');
             const updateButton = buttonContainer.createEl('button', {
-                text: `Update ${stats.modified + stats.new} files`,
+                text: `Update ${needsUpdate} files`,
                 cls: 'mod-cta'
             });
             
@@ -132,6 +185,16 @@ export default class CombinedPlugin extends Plugin {
                 updateButton.disabled = false;
                 updateButton.setText('Update complete');
             };
+        }
+        
+        // Last update time
+        const lastUpdate = this.embeddingService.getLastUpdateTime();
+        if (lastUpdate > 0) {
+            const lastUpdateDate = new Date(lastUpdate);
+            statusContainer.createEl('p', {
+                text: `Last updated: ${lastUpdateDate.toLocaleDateString()} ${lastUpdateDate.toLocaleTimeString()}`,
+                cls: 'setting-item-description embedding-last-update'
+            });
         }
     }
 

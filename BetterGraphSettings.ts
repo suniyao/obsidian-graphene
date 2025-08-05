@@ -1,5 +1,7 @@
 import { App, PluginSettingTab, Setting, Notice } from 'obsidian';
 import type CombinedPlugin from './main';
+import { EmbeddingService } from 'EmbeddingService';
+import { EmbeddingCache } from 'types';
 
 export class CombinedSettingTab extends PluginSettingTab {
     plugin: CombinedPlugin;
@@ -227,12 +229,7 @@ export class CombinedSettingTab extends PluginSettingTab {
                 .setWarning()
                 .onClick(async () => {
                     if (confirm('Are you sure you want to clear all embeddings? You will need to regenerate them.')) {
-                        this.plugin.embeddingCache = {
-                            version: '1.0.0',
-                            files: {},
-                            embeddings: {}
-                        };
-                        await this.plugin.saveEmbeddingCache();
+                        await this.plugin.embeddingService.clearCache();
                         this.plugin.updateEmbeddingStatusUI();
                         new Notice('Embedding cache cleared');
                     }
@@ -249,60 +246,5 @@ export class CombinedSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                     new Notice('All customizations reset');
                 }));
-
-        // Embedding Status
-        containerEl.createEl('h3', { text: 'Embedding Status' });
-        const statusContainer = containerEl.createDiv('embedding-status');
-        this.updateEmbeddingStatus(statusContainer);
-    }
-
-    async updateEmbeddingStatus(container: HTMLElement) {
-        if (!container) return;
-        
-        container.empty();
-        
-        const data = await this.plugin.loadData() || {};
-        const embeddings = data.embeddings || {};
-        const metadata = data.embeddingMetadata || {};
-        const totalFiles = this.plugin.app.vault.getMarkdownFiles().length;
-        const embeddedFiles = Object.keys(embeddings).length;
-        
-        const status = container.createEl('p', {
-            text: `${embeddedFiles} of ${totalFiles} files have embeddings`,
-            cls: 'setting-item-description'
-        });
-
-        if (embeddedFiles > 0) {
-            const percentage = Math.round((embeddedFiles / totalFiles) * 100);
-            const progressBar = container.createDiv('embedding-progress');
-            progressBar.style.cssText = `
-                width: 100%;
-                height: 4px;
-                background: var(--background-modifier-border);
-                border-radius: 2px;
-                margin-top: 8px;
-            `;
-            const progress = progressBar.createDiv();
-            progress.style.cssText = `
-                width: ${percentage}%;
-                height: 100%;
-                background: var(--interactive-accent);
-                border-radius: 2px;
-                transition: width 0.3s ease;
-            `;
-
-            // Show last update time if available
-            const lastUpdate = Object.values(metadata)
-                .map((m: any) => new Date(m.embeddedAt).getTime())
-                .reduce((a, b) => Math.max(a, b), 0);
-            
-            if (lastUpdate > 0) {
-                const lastUpdateDate = new Date(lastUpdate);
-                container.createEl('p', {
-                    text: `Last updated: ${lastUpdateDate.toLocaleDateString()} ${lastUpdateDate.toLocaleTimeString()}`,
-                    cls: 'setting-item-description'
-                });
-            }
-        }
     }
 }

@@ -22,6 +22,14 @@ export class EmbeddingService {
         };
     }
 
+    getLastUpdateTime(): number {
+        const times = Object.values(this.embeddingCache.files)
+            .map(f => f.embeddingGenerated)
+            .filter(t => t > 0);
+        
+        return times.length > 0 ? Math.max(...times) : 0;
+    }
+
     updateSettings(settings: BetterGraphSettings) {
         this.openaiApiKey = settings.openaiApiKey;
         this.pineconeApiKey = settings.pineconeApiKey;

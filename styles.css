@@ -367,3 +367,90 @@
     display: flex;
     justify-content: center;
 }
+
+/* Embedding Status Progress Bar */
+.embedding-status-container {
+    margin-top: 12px;
+    padding: 16px;
+    background: var(--background-secondary);
+    border-radius: 6px;
+}
+
+.embedding-status-container p {
+    margin: 0 0 12px 0;
+}
+
+.embedding-status-warning {
+    color: var(--text-warning);
+    font-weight: 500;
+}
+
+.embedding-progress {
+    width: 100%;
+    height: 8px;
+    background: var(--background-modifier-border);
+    border-radius: 4px;
+    overflow: hidden;
+    display: flex;
+    margin-bottom: 8px;
+}
+
+.progress-segment {
+    height: 100%;
+    transition: width 0.3s ease;
+}
+
+.progress-up-to-date {
+    background: var(--interactive-success);
+}
+
+.progress-modified {
+    background: var(--text-warning);
+}
+
+.progress-new {
+    background: var(--interactive-accent);
+}
+
+.embedding-legend {
+    display: flex;
+    gap: 16px;
+    font-size: var(--font-ui-small);
+    margin: 8px 0 12px 0;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+}
+
+.legend-up-to-date {
+    background: var(--interactive-success);
+}
+
+.legend-modified {
+    background: var(--text-warning);
+}
+
+.legend-new {
+    background: var(--interactive-accent);
+}
+
+.embedding-last-update {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    margin-top: 12px !important;
+}
+
+.button-container {
+    display: flex;
+    justify-content: center;
+    margin: 12px 0;
+}
