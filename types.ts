@@ -75,7 +75,7 @@ export interface GraphLink {
     id: string;
     similarity?: number;
     thickness?: number;
-    type?: 'link' | 'tag-link';
+    type?: 'link' | 'tag-link' | 'manual-link';
 }
 
 // Add these interfaces

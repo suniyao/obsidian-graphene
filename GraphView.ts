@@ -190,11 +190,12 @@ async loadGraphData() {
     // Create links
     this.links = [];
     
-    // Create file-to-file links
+    // Create traditional markdown [[links]] (always)
+    this.createTraditionalLinks(files, nodeMap);
+    
+    // Create embedding-based similarity links (if enabled)
     if (this.plugin.settings.useEmbeddings && this.nodes.some(n => n.embedding)) {
         await this.createEmbeddingBasedLinks(nodeMap);
-    } else {
-        this.createTraditionalLinks(files, nodeMap);
     }
     
     // Create tag links
@@ -273,10 +274,27 @@ createTagLinks(files: TFile[], nodeMap: Map<string, GraphNode>, tagNodes: Map<st
     async createEmbeddingBasedLinks(nodeMap: Map<string, GraphNode>) {
         const nodesArray = Array.from(nodeMap.values());
         
+        // Build a set of existing manual link pairs for quick lookup
+        const manualLinkPairs = new Set<string>();
+        this.links.forEach(link => {
+            if (link.type === 'manual-link') {
+                const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
+                const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
+                // Store both directions since manual links are directional but similarity is bidirectional
+                manualLinkPairs.add(`${sourceId}|${targetId}`);
+                manualLinkPairs.add(`${targetId}|${sourceId}`);
+            }
+        });
+        
         for (let i = 0; i < nodesArray.length; i++) {
             for (let j = i + 1; j < nodesArray.length; j++) {
                 const nodeA = nodesArray[i];
                 const nodeB = nodesArray[j];
+                
+                // Skip if manual link already exists between these nodes
+                if (manualLinkPairs.has(`${nodeA.id}|${nodeB.id}`)) {
+                    continue;
+                }
                 
                 if (nodeA.embedding && nodeB.embedding) {
                     const similarity = this.plugin.embeddingService.calculateCosineSimilarity(
@@ -312,6 +330,7 @@ createTagLinks(files: TFile[], nodeMap: Map<string, GraphNode>, tagNodes: Map<st
                             source: file.path,
                             target: targetFile.path,
                             id: linkId,
+                            type: 'manual-link' as const,  // Mark as manual link to render as solid line
                             thickness: this.plugin.settings.defaultLinkThickness
                         });
                     }

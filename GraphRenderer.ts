@@ -18,6 +18,7 @@ export class GraphRenderer {
     private nodeElements: d3.Selection<SVGGElement, GraphNode, SVGGElement, unknown>;
     private zoom: d3.ZoomBehavior<SVGSVGElement, unknown>;
     private isAnimating: boolean = true;
+    private showArrows: boolean = false;
 
     constructor(container: HTMLElement, plugin: BetterGraphPlugin, view: BetterGraphView) {
         this.container = container;
@@ -111,6 +112,7 @@ private setupLinks() {
         .attr('class', d => `link-group ${d.type || 'normal'}`);
     
     // Add either solid lines or prepare for dotted lines
+    const showArrows = this.showArrows;
     this.linkElements.each(function(d) {
         const group = d3.select(this);
         
@@ -123,8 +125,8 @@ private setupLinks() {
                 .attr('class', 'link solid-link')
                 .attr('stroke', 'var(--text-muted)')
                 .attr('stroke-opacity', 0.6)
-                .attr('stroke-width', d.type === 'tag-link' ? 1 : 2)
-                .attr('marker-end', d.type === 'tag-link' ? null : 'url(#arrow)');
+                .attr('stroke-width', (d.type === 'tag-link' || d.type === 'manual-link') ? 1 : 2)
+                .attr('marker-end', showArrows ? 'url(#arrow)' : null);
         }
     });
 }
@@ -232,6 +234,7 @@ private setupNodes() {
                 });
 
             // Update link styling - highlight if edge pair contains hovered node
+            const showArrows = this.showArrows;
             this.linkElements.each(function(d: any) {
                 const group = d3.select(this);
                 const sourceId = typeof d.source === 'string' ? d.source : d.source.id;
@@ -245,18 +248,15 @@ private setupNodes() {
                     .transition()
                     .duration(200)
                     .attr('stroke', isConnected ? 'var(--interactive-accent)' : 'var(--text-muted)') // Fixed: different colors
-                    .attr('stroke-opacity', isConnected ? 0.8 : 0.2)
-                    .attr('marker-end', (d: GraphLink) => {
-                        if (d.type === 'tag-link') return null;
-                        return isConnected ? 'url(#arrow-accent)' : 'url(#arrow)';
-                    });
+                    .attr('stroke-opacity', isConnected ? 1 : 0.2)
+                    .attr('marker-end', (d: GraphLink) => showArrows ? (isConnected ? 'url(#arrow-accent)' : 'url(#arrow)') : null);
                 
                 // Update dots for similarity links
                 group.selectAll('circle.link-dot')
                     .transition()
                     .duration(200)
                     .attr('fill', isConnected ? 'var(--interactive-accent)' : 'var(--text-muted)')
-                    .attr('opacity', isConnected ? 0.8 : 0.2);
+                    .attr('opacity', isConnected ? 1 : 0.2);
             });
 
             // Update text styling (opacity + size + vertical offset)
@@ -283,6 +283,7 @@ private setupNodes() {
                 .attr('opacity', 1);
 
             // Reset link styling
+            const showArrowsReset = this.showArrows;
             this.linkElements.each(function() {
                 const group = d3.select(this);
                 
@@ -291,10 +292,7 @@ private setupNodes() {
                     .duration(200)
                     .attr('stroke', 'var(--text-muted)')
                     .attr('stroke-opacity', 0.6)
-                    .attr('marker-end', (d: GraphLink) => {
-                        if (d.type === 'tag-link') return null;
-                        return 'url(#arrow)';
-                    });
+                    .attr('marker-end', (d: GraphLink) => showArrowsReset ? 'url(#arrow)' : null);
                 
                 group.selectAll('circle.link-dot')
                     .transition()
@@ -376,6 +374,7 @@ private setupNodes() {
             });
 
         // Update link styling - highlight if edge pair contains hovered node
+        const showArrows2 = this.showArrows;
         this.linkElements.each(function(d: any) {
             const group = d3.select(this);
             const sourceId = typeof d.source === 'string' ? d.source : d.source.id;
@@ -389,11 +388,8 @@ private setupNodes() {
                 .transition()
                 .duration(200)
                 .attr('stroke', isConnected ? 'var(--interactive-accent)' : 'var(--text-muted)')
-                .attr('stroke-opacity', isConnected ? 0.8 : 0.2)
-                .attr('marker-end', (d: GraphLink) => {
-                    if (d.type === 'tag-link') return null;
-                    return isConnected ? 'url(#arrow-accent)' : 'url(#arrow)';
-                });
+                .attr('stroke-opacity', isConnected ? 1 : 0.2)
+                .attr('marker-end', (d: GraphLink) => showArrows2 ? (isConnected ? 'url(#arrow-accent)' : 'url(#arrow)') : null);
             
             // Update dots
             group.selectAll('circle')
@@ -760,7 +756,9 @@ private ticked() {
     }
 
     toggleArrows(showArrows: boolean) {
-        this.linkElements
+        this.showArrows = showArrows;
+        // Update all existing solid lines' markers
+        this.linkElements?.selectAll('line')
             .attr('marker-end', showArrows ? 'url(#arrow)' : null);
     }
 
