@@ -40,7 +40,7 @@ export const DEFAULT_SETTINGS: BetterGraphSettings = {
     embeddingWordLimit: 100,
     
     // Graph Display - Updated physics values
-    nodeSize: 12,
+    nodeSize: 6,
     linkDistance: 80,      // Reduced from 100
     repulsionForce: 500,   // Increased from 300
     centerForce: 0.1,      // Reduced from 0.3
