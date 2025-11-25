@@ -178,7 +178,9 @@ private setupNodes() {
 
         // Add hover effects with relationship highlighting
         this.nodeElements.on('mouseenter', (event, hoveredNode) => {
-            // Get connected nodes
+            // Build edge set as pairs: E = {(v1, v2) | v1, v2 are vertices}
+            // Store edges that meet threshold and involve the hovered node
+            const connectedEdges = new Set<string>();
             const connectedNodeIds = new Set<string>();
             connectedNodeIds.add(hoveredNode.id);
             
@@ -186,10 +188,23 @@ private setupNodes() {
                 const sourceId = typeof link.source === 'string' ? link.source : (link.source as any).id;
                 const targetId = typeof link.target === 'string' ? link.target : (link.target as any).id;
                 
-                if (sourceId === hoveredNode.id) {
-                    connectedNodeIds.add(targetId);
-                } else if (targetId === hoveredNode.id) {
-                    connectedNodeIds.add(sourceId);
+                // Check if the link meets the similarity threshold (or is not a similarity link)
+                const meetsThreshold = link.similarity != undefined && link.similarity > this.plugin.settings.similarityThreshold;
+                
+                if (meetsThreshold) {
+                    // Create edge pair identifier
+                    const edgePair = `${sourceId}|${targetId}`;
+                    
+                    // If hovered node is in this edge pair, mark edge as connected
+                    if (sourceId === hoveredNode.id || targetId === hoveredNode.id) {
+                        connectedEdges.add(edgePair);
+                        // Also track connected nodes for styling
+                        if (sourceId === hoveredNode.id) {
+                            connectedNodeIds.add(targetId);
+                        } else {
+                            connectedNodeIds.add(sourceId);
+                        }
+                    }
                 }
             });
 
@@ -216,12 +231,14 @@ private setupNodes() {
                     }
                 });
 
-            // Update link styling - handle both solid lines and dots
+            // Update link styling - highlight if edge pair contains hovered node
             this.linkElements.each(function(d: any) {
                 const group = d3.select(this);
                 const sourceId = typeof d.source === 'string' ? d.source : d.source.id;
                 const targetId = typeof d.target === 'string' ? d.target : d.target.id;
-                const isConnected = sourceId === hoveredNode.id || targetId === hoveredNode.id;
+                const edgePair = `${sourceId}|${targetId}`;
+                // An edge is highlighted if it's in our connected edges set
+                const isConnected = connectedEdges.has(edgePair);
                 
                 // Update solid lines
                 group.select('line')
@@ -242,16 +259,19 @@ private setupNodes() {
                     .attr('opacity', isConnected ? 0.8 : 0.2);
             });
 
-            // Update text opacity
+            // Update text styling (opacity + size + vertical offset)
             this.nodeElements.selectAll('text')
                 .transition()
                 .duration(200)
-                .style('opacity', (d: GraphNode) => {
-                    if (d.id === hoveredNode.id || connectedNodeIds.has(d.id)) {
-                        return 1;
-                    } else {
-                        return 0.3;
-                    }
+                .style('opacity', (d: GraphNode) => (d.id === hoveredNode.id || connectedNodeIds.has(d.id)) ? 1 : 0.3)
+                .style('font-size', (d: GraphNode) => {
+                    const base = d.type === 'tag' ? 11 : 12;
+                    const size = (d.id === hoveredNode.id) ? base * 1.2 : base;
+                    return size + 'px';
+                })
+                .attr('y', (d: GraphNode) => {
+                    const baseY = (d.type === 'tag' ? this.plugin.settings.nodeSize * 0.8 : this.plugin.settings.nodeSize) + 15;
+                    return (d.id === hoveredNode.id) ? baseY + 12 : baseY; // shift hovered label slightly downward
                 });
         })
         .on('mouseleave', () => {
@@ -286,7 +306,9 @@ private setupNodes() {
             this.nodeElements.selectAll('text')
                 .transition()
                 .duration(200)
-                .style('opacity', 1);
+                .style('opacity', 1)
+                .style('font-size', (d: GraphNode) => d.type === 'tag' ? '11px' : '12px')
+                .attr('y', (d: GraphNode) => (d.type === 'tag' ? this.plugin.settings.nodeSize * 0.8 : this.plugin.settings.nodeSize) + 10);
         });
 
         // Handle clicks
@@ -302,7 +324,9 @@ private setupNodes() {
 
         // Update hover effects
     this.nodeElements.on('mouseenter', (event, hoveredNode) => {
-        // Get connected nodes
+        // Build edge set as pairs: E = {(v1, v2) | v1, v2 are vertices}
+        // Store edges that meet threshold and involve the hovered node
+        const connectedEdges = new Set<string>();
         const connectedNodeIds = new Set<string>();
         connectedNodeIds.add(hoveredNode.id);
         
@@ -310,10 +334,23 @@ private setupNodes() {
             const sourceId = typeof link.source === 'string' ? link.source : (link.source as any).id;
             const targetId = typeof link.target === 'string' ? link.target : (link.target as any).id;
             
-            if (sourceId === hoveredNode.id) {
-                connectedNodeIds.add(targetId);
-            } else if (targetId === hoveredNode.id) {
-                connectedNodeIds.add(sourceId);
+            // Check if the link meets the similarity threshold (or is not a similarity link)
+            const meetsThreshold = link.similarity !== undefined && link.similarity > this.plugin.settings.similarityThreshold;
+            
+            if (meetsThreshold) {
+                // Create edge pair identifier
+                const edgePair = `${sourceId}|${targetId}`;
+                
+                // If hovered node is in this edge pair, mark edge as connected
+                if (sourceId === hoveredNode.id || targetId === hoveredNode.id) {
+                    connectedEdges.add(edgePair);
+                    // Also track connected nodes for styling
+                    if (sourceId === hoveredNode.id) {
+                        connectedNodeIds.add(targetId);
+                    } else {
+                        connectedNodeIds.add(sourceId);
+                    }
+                }
             }
         });
 
@@ -338,12 +375,14 @@ private setupNodes() {
                 }
             });
 
-        // Update link styling - handle both solid lines and dots
+        // Update link styling - highlight if edge pair contains hovered node
         this.linkElements.each(function(d: any) {
             const group = d3.select(this);
             const sourceId = typeof d.source === 'string' ? d.source : d.source.id;
             const targetId = typeof d.target === 'string' ? d.target : d.target.id;
-            const isConnected = sourceId === hoveredNode.id || targetId === hoveredNode.id;
+            const edgePair = `${sourceId}|${targetId}`;
+            // An edge is highlighted if it's in our connected edges set
+            const isConnected = connectedEdges.has(edgePair);
             
             // Update solid lines
             group.selectAll('line')
@@ -361,19 +400,22 @@ private setupNodes() {
                 .transition()
                 .duration(200)
                 .attr('fill', isConnected ? 'var(--interactive-accent)' : 'var(--text-muted)')
-                .attr('opacity', isConnected ? 0.8 : 0.2);
+                .attr('opacity', isConnected ? 1 : 0.2);
         });
 
-        // Update text opacity
+        // Update text styling (opacity + size + vertical offset)
         this.nodeElements.selectAll('text')
             .transition()
             .duration(200)
-            .style('opacity', (d: GraphNode) => {
-                if (d.id === hoveredNode.id || connectedNodeIds.has(d.id)) {
-                    return 1;
-                } else {
-                    return 0.3;
-                }
+            .style('opacity', (d: GraphNode) => (d.id === hoveredNode.id || connectedNodeIds.has(d.id)) ? 1 : 0.3)
+            .style('font-size', (d: GraphNode) => {
+                const base = d.type === 'tag' ? 11 : 12;
+                const size = (d.id === hoveredNode.id) ? base * 1.2 : base;
+                return size + 'px';
+            })
+            .attr('y', (d: GraphNode) => {
+                const baseY = (d.type === 'tag' ? this.plugin.settings.nodeSize * 0.8 : this.plugin.settings.nodeSize) + 15;
+                return (d.id === hoveredNode.id) ? baseY + 12 : baseY;
             });
     })
     .on('mouseleave', () => {
@@ -404,7 +446,9 @@ private setupNodes() {
         this.nodeElements.selectAll('text')
             .transition()
             .duration(200)
-            .style('opacity', 1);
+            .style('opacity', 1)
+            .style('font-size', (d: GraphNode) => d.type === 'tag' ? '11px' : '12px')
+            .attr('y', (d: GraphNode) => (d.type === 'tag' ? this.plugin.settings.nodeSize * 0.8 : this.plugin.settings.nodeSize) + 15);
     });
 }
 
@@ -479,7 +523,9 @@ private setupSimulation() {
             .id(d => d.id)
             .distance(d => {
                 if (d.similarity !== undefined) {
-                    return this.plugin.settings.linkDistance * (2 - d.similarity);
+                    // Tighter distance range: at similarity=1 (identical), distance=0.5x base
+                    // at similarity=0, distance=1.2x base (reduced max from 2x)
+                    return this.plugin.settings.linkDistance * (1.2 - 0.7 * d.similarity);
                 }
                 return this.plugin.settings.linkDistance;
             })
@@ -542,7 +588,8 @@ private setupSimulation() {
             (this.simulation.force('link') as d3.ForceLink<GraphNode, GraphLink>)
                 ?.distance(d => {
                     if (d.similarity !== undefined) {
-                        return this.plugin.settings.linkDistance * (2 - d.similarity);
+                        // Tighter distance range: at similarity=1, distance=0.5x base; at similarity=0, distance=1.2x base
+                        return this.plugin.settings.linkDistance * (1.2 - 0.7 * d.similarity);
                     }
                     return this.plugin.settings.linkDistance;
                 });
@@ -646,6 +693,7 @@ private setupSimulation() {
 
 private ticked() {
     // Update link positions
+    const similarityThreshold = this.plugin.settings.similarityThreshold;
     this.linkElements.each(function(d: any) {
         const group = d3.select(this);
         const source = d.source as GraphNode;
@@ -665,11 +713,9 @@ private ticked() {
             const dx = target.x! - source.x!;
             const dy = target.y! - source.y!;
             const distance = Math.sqrt(dx * dx + dy * dy);
-            
-            // Calculate dot spacing based on similarity (distance = 1/correlation)
             const dotRadius = 1.5;
-            // const spacing = Math.max(4, (1 / sim) * 15);
-            const spacing = 1 / (sim - 0.8)
+            // Spacing inversely proportional to similarity above threshold: higher similarity = tighter spacing
+            const spacing = Math.min(1 / (sim - similarityThreshold), 30); // make it a bit loosen
             
             // Remove old dots
             group.selectAll('circle').remove();
