@@ -1,6 +1,6 @@
 import { Plugin, TFile, Notice, requestUrl } from 'obsidian';
 import { BetterGraphView, VIEW_TYPE_GRAPH } from './GraphView';
-import { CombinedSettingTab } from './BetterGraphSettings';
+import { CombinedSettingTab } from './GraphSettings';
 import { BetterGraphSettings, DEFAULT_SETTINGS } from './types';
 import { EmbeddingService } from './EmbeddingService';
 

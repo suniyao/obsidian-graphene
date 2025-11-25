@@ -13,9 +13,6 @@ export class CombinedSettingTab extends PluginSettingTab {
 
     display(): void {
         const { containerEl } = this;
-        containerEl.empty();
-
-        containerEl.createEl('h2', { text: 'Better Graph & AI Tools Settings' });
 
         // API Configuration Section
         containerEl.createEl('h3', { text: 'API Configuration' });
