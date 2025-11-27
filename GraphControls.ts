@@ -103,7 +103,7 @@ export class GraphControls {
             }
         );
         
-        this.createSlider(displaySection, 'Link thickness',
+        this.createSlider(displaySection, 'Edge thickness',
             0.5, 5, 0.5, this.plugin.settings.defaultLinkThickness,
             (value) => {
                 this.plugin.settings.defaultLinkThickness = value;

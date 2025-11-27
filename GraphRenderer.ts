@@ -124,6 +124,7 @@ private setupLinks() {
     
     // Add either solid lines or prepare for dotted lines
     const showArrows = this.showArrows;
+    const defaultThickness = this.plugin.settings.defaultLinkThickness;
     this.linkElements.each(function(d) {
         const group = d3.select(this);
         
@@ -136,7 +137,7 @@ private setupLinks() {
                 .attr('class', 'link solid-link')
                 .attr('stroke', 'var(--text-muted)')
                 .attr('stroke-opacity', 0.6)
-                .attr('stroke-width', (d.type === 'tag-link' || d.type === 'manual-link') ? 1 : 2)
+                .attr('stroke-width', defaultThickness)
                 .attr('marker-end', showArrows ? 'url(#arrow)' : null);
         }
     });
@@ -167,7 +168,7 @@ private setupNodes() {
         })
         .attr('fill', d => {
             if (d.type === 'tag') {
-                return 'var(--text-accent)';
+                return 'var(--text-success)';
             }
             return 'var(--text-muted)';
         })
@@ -186,141 +187,6 @@ private setupNodes() {
             .style('font-size', d => d.type === 'tag' ? '11px' : '12px')
             .style('font-weight', d => d.type === 'tag' ? '600' : 'normal');
 
-                // Add hover effects with relationship highlighting
-        // Update the hover effects in setupNodes method:
-
-        // Add hover effects with relationship highlighting
-        this.nodeElements.on('mouseenter', (event, hoveredNode) => {
-            // Build edge set as pairs: E = {(v1, v2) | v1, v2 are vertices}
-            // Store edges that meet threshold and involve the hovered node
-            const connectedEdges = new Set<string>();
-            const connectedNodeIds = new Set<string>();
-            connectedNodeIds.add(hoveredNode.id);
-            
-            this.links.forEach(link => {
-                const sourceId = typeof link.source === 'string' ? link.source : (link.source as any).id;
-                const targetId = typeof link.target === 'string' ? link.target : (link.target as any).id;
-                
-                // Check if the link meets the similarity threshold (or is not a similarity link)
-                const meetsThreshold = link.similarity != undefined && link.similarity > this.plugin.settings.similarityThreshold;
-                
-                if (meetsThreshold) {
-                    // Create edge pair identifier
-                    const edgePair = `${sourceId}|${targetId}`;
-                    
-                    // If hovered node is in this edge pair, mark edge as connected
-                    if (sourceId === hoveredNode.id || targetId === hoveredNode.id) {
-                        connectedEdges.add(edgePair);
-                        // Also track connected nodes for styling
-                        if (sourceId === hoveredNode.id) {
-                            connectedNodeIds.add(targetId);
-                        } else {
-                            connectedNodeIds.add(sourceId);
-                        }
-                    }
-                }
-            });
-
-            // Update node styling
-            this.nodeElements.selectAll('circle')
-                .transition()
-                .duration(200)
-                .attr('fill', function(d: GraphNode) {
-                    if (d.id === hoveredNode.id) {
-                        return 'var(--text-success)'; // Green for hovered node
-                    } else if (connectedNodeIds.has(d.id)) {
-                        // Use accent color for connected file nodes, keep tag nodes as accent
-                        return d.type === 'tag' ? 'var(--text-accent)' : 'var(--interactive-accent)';
-                    } else {
-                        // Keep original color for unrelated nodes
-                        return d.type === 'tag' ? 'var(--text-accent)' : 'var(--text-muted)';
-                    }
-                })
-                .attr('opacity', (d: GraphNode) => {
-                    if (d.id === hoveredNode.id || connectedNodeIds.has(d.id)) {
-                        return 1;
-                    } else {
-                        return 0.3; // Reduced opacity for unrelated nodes
-                    }
-                });
-
-            // Update link styling - highlight if edge pair contains hovered node
-            const showArrows = this.showArrows;
-            this.linkElements.each(function(d: any) {
-                const group = d3.select(this);
-                const sourceId = typeof d.source === 'string' ? d.source : d.source.id;
-                const targetId = typeof d.target === 'string' ? d.target : d.target.id;
-                const edgePair = `${sourceId}|${targetId}`;
-                // An edge is highlighted if it's in our connected edges set
-                const isConnected = connectedEdges.has(edgePair);
-                
-                // Update solid lines
-                group.select('line')
-                    .transition()
-                    .duration(200)
-                    .attr('stroke', isConnected ? 'var(--interactive-accent)' : 'var(--text-muted)') // Fixed: different colors
-                    .attr('stroke-opacity', isConnected ? 1 : 0.2)
-                    .attr('marker-end', (d: GraphLink) => showArrows ? (isConnected ? 'url(#arrow-accent)' : 'url(#arrow)') : null);
-                
-                // Update dots for similarity links
-                group.selectAll('circle.link-dot')
-                    .transition()
-                    .duration(200)
-                    .attr('fill', isConnected ? 'var(--interactive-accent)' : 'var(--text-muted)')
-                    .attr('opacity', isConnected ? 1 : 0.2);
-            });
-
-            // Update text styling (opacity + size + vertical offset)
-            this.nodeElements.selectAll('text')
-                .transition()
-                .duration(200)
-                .style('opacity', (d: GraphNode) => (d.id === hoveredNode.id || connectedNodeIds.has(d.id)) ? 1 : 0.3)
-                .style('font-size', (d: GraphNode) => {
-                    const base = d.type === 'tag' ? 11 : 12;
-                    const size = (d.id === hoveredNode.id) ? base * 1.2 : base;
-                    return size + 'px';
-                })
-                .attr('y', (d: GraphNode) => {
-                    const baseY = (d.type === 'tag' ? this.plugin.settings.nodeSize * 0.8 : this.plugin.settings.nodeSize) + 15;
-                    return (d.id === hoveredNode.id) ? baseY + 12 : baseY; // shift hovered label slightly downward
-                });
-        })
-        .on('mouseleave', () => {
-            // Reset all styling
-            this.nodeElements.selectAll('circle')
-                .transition()
-                .duration(200)
-                .attr('fill', (d: GraphNode) => d.type === 'tag' ? 'var(--text-accent)' : 'var(--text-muted)')
-                .attr('opacity', 1);
-
-            // Reset link styling
-            const showArrowsReset = this.showArrows;
-            this.linkElements.each(function() {
-                const group = d3.select(this);
-                
-                group.select('line')
-                    .transition()
-                    .duration(200)
-                    .attr('stroke', 'var(--text-muted)')
-                    .attr('stroke-opacity', 0.6)
-                    .attr('marker-end', (d: GraphLink) => showArrowsReset ? 'url(#arrow)' : null);
-                
-                group.selectAll('circle.link-dot')
-                    .transition()
-                    .duration(200)
-                    .attr('fill', 'var(--text-muted)')
-                    .attr('opacity', 0.6);
-            });
-
-            this.nodeElements.selectAll('text')
-                .transition()
-                .duration(200)
-                .style('opacity', 1)
-                .style('font-size', (d: GraphNode) => d.type === 'tag' ? '11px' : '12px')
-                .attr('y', (d: GraphNode) => (d.type === 'tag' ? this.plugin.settings.nodeSize * 0.8 : this.plugin.settings.nodeSize) + 10);
-        });
-
-        // Handle clicks
         this.nodeElements.on('click', async (event, d) => {
             event.stopPropagation();
             if (d.type !== 'tag') {
@@ -344,22 +210,15 @@ private setupNodes() {
             const targetId = typeof link.target === 'string' ? link.target : (link.target as any).id;
             
             // Check if the link meets the similarity threshold (or is not a similarity link)
-            const meetsThreshold = link.similarity !== undefined && link.similarity > this.plugin.settings.similarityThreshold;
-            
-            if (meetsThreshold) {
-                // Create edge pair identifier
-                const edgePair = `${sourceId}|${targetId}`;
-                
-                // If hovered node is in this edge pair, mark edge as connected
-                if (sourceId === hoveredNode.id || targetId === hoveredNode.id) {
-                    connectedEdges.add(edgePair);
-                    // Also track connected nodes for styling
-                    if (sourceId === hoveredNode.id) {
-                        connectedNodeIds.add(targetId);
-                    } else {
-                        connectedNodeIds.add(sourceId);
-                    }
-                }
+            const type2 = (link as any).type;
+            const isManual2 = type2 === 'manual-link';
+            const isTagLink2 = type2 === 'tag-link';
+            const meetsThreshold2 = isManual2 || isTagLink2 || (link.similarity !== undefined && link.similarity > this.plugin.settings.similarityThreshold);
+            if (!meetsThreshold2) return;
+            const edgePair2 = `${sourceId}|${targetId}`;
+            if (sourceId === hoveredNode.id || targetId === hoveredNode.id) {
+                connectedEdges.add(edgePair2);
+                connectedNodeIds.add(sourceId === hoveredNode.id ? targetId : sourceId);
             }
         });
 
@@ -369,11 +228,11 @@ private setupNodes() {
             .duration(200)
             .attr('fill', function(d: GraphNode) {
                 if (d.id === hoveredNode.id) {
-                    return 'var(--text-success)';
+                    return 'var(--text-accent)';
                 } else if (connectedNodeIds.has(d.id)) {
-                    return d.type === 'tag' ? 'var(--text-accent)' : 'var(--text-muted)';
+                    return d.type === 'tag' ? 'var(--text-success)' : 'var(--text-muted)';
                 } else {
-                    return d.type === 'tag' ? 'var(--text-accent)' : 'var(--text-muted)';
+                    return d.type === 'tag' ? 'var(--text-success)' : 'var(--text-muted)';
                 }
             })
             .attr('opacity', (d: GraphNode) => {
@@ -391,23 +250,23 @@ private setupNodes() {
             const sourceId = typeof d.source === 'string' ? d.source : d.source.id;
             const targetId = typeof d.target === 'string' ? d.target : d.target.id;
             const edgePair = `${sourceId}|${targetId}`;
-            // An edge is highlighted if it's in our connected edges set
-            const isConnected = connectedEdges.has(edgePair);
+            // An edge is highlighted if it's in our connected edges set (already filtered to involve hovered node)
+            const highlight = connectedEdges.has(edgePair);
             
-            // Update solid lines
-            group.selectAll('line')
+            // Update solid lines (for manual-link and tag-link)
+            group.selectAll('line.solid-link')
                 .transition()
                 .duration(200)
-                .attr('stroke', isConnected ? 'var(--interactive-accent)' : 'var(--text-muted)')
-                .attr('stroke-opacity', isConnected ? 1 : 0.2)
-                .attr('marker-end', (d: GraphLink) => showArrows2 ? (isConnected ? 'url(#arrow-accent)' : 'url(#arrow)') : null);
+                .attr('stroke', highlight ? 'var(--interactive-accent)' : 'var(--text-muted)')
+                .attr('stroke-opacity', highlight ? 1 : 0.2)
+                .attr('marker-end', (d: GraphLink) => showArrows2 ? (highlight ? 'url(#arrow-accent)' : 'url(#arrow)') : null);
             
-            // Update dots
+            // Update dots (for similarity links)
             group.selectAll('circle')
                 .transition()
                 .duration(200)
-                .attr('fill', isConnected ? 'var(--interactive-accent)' : 'var(--text-muted)')
-                .attr('opacity', isConnected ? 1 : 0.2);
+                .attr('fill', highlight ? 'var(--interactive-accent)' : 'var(--text-muted)')
+                .attr('opacity', highlight ? 1 : 0.2);
         });
 
         // Update text styling (opacity + size + vertical offset)
@@ -430,7 +289,7 @@ private setupNodes() {
         this.nodeElements.selectAll('circle')
             .transition()
             .duration(200)
-            .attr('fill', (d: GraphNode) => d.type === 'tag' ? 'var(--text-accent)' : 'var(--text-muted)')
+            .attr('fill', (d: GraphNode) => d.type === 'tag' ? 'var(--text-success)' : 'var(--text-muted)')
             .attr('opacity', 1);
 
         // Reset link styling
@@ -840,8 +699,19 @@ updateNodeSize(size: number) {
     }
 }
     updateLinkThickness(thickness: number) {
-        this.linkElements
-            .attr('stroke-width', d => d.thickness || thickness);
+        // Apply thickness to solid lines inside each link group.
+        this.linkElements.each(function(rawLink: GraphLink) {
+            const group = d3.select(this);
+            const isSolidLink = rawLink.type === 'manual-link' || rawLink.type === 'tag-link' || !rawLink.type;
+            const width = isSolidLink ? thickness : (rawLink.thickness || thickness);
+            group.select('line.solid-link')
+                .attr('stroke-width', width);
+        });
+
+        // Keep dotted similarity edges visually in sync by scaling their dot radius.
+        const dotRadius = Math.max(1, thickness / 2);
+        this.linkElements.selectAll('circle.link-dot')
+            .attr('r', dotRadius);
     }
 
     updateLinkForce(strength: number) {

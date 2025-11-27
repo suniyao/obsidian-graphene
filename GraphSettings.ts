@@ -225,11 +225,11 @@ export class CombinedSettingTab extends PluginSettingTab {
                 }));
 
         // Link Thickness Settings
-        containerEl.createEl('h3', { text: 'Link Thickness' });
+        containerEl.createEl('h3', { text: 'Edge Thickness' });
 
         new Setting(containerEl)
-            .setName('Default Link Thickness')
-            .setDesc('Thickness for traditional links')
+            .setName('Default Edge Thickness')
+            .setDesc('Thickness for traditional edges')
             .addSlider(slider => slider
                 .setLimits(0.5, 10, 0.5)
                 .setValue(this.plugin.settings.defaultLinkThickness)
@@ -326,7 +326,7 @@ export class CombinedSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName('Reset Customizations')
-            .setDesc('Reset all custom link thickness settings')
+            .setDesc('Reset all custom settings')
             .addButton(button => button
                 .setButtonText('Reset All')
                 .setWarning()
