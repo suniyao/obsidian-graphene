@@ -2,6 +2,7 @@ import { App, PluginSettingTab, Setting, Notice } from 'obsidian';
 import type CombinedPlugin from './main';
 import { EmbeddingService } from 'EmbeddingService';
 import { EmbeddingCache } from 'types';
+import { BetterGraphView, VIEW_TYPE_GRAPH } from './GraphView';
 
 export class CombinedSettingTab extends PluginSettingTab {
     plugin: CombinedPlugin;
@@ -9,6 +10,15 @@ export class CombinedSettingTab extends PluginSettingTab {
     constructor(app: App, plugin: CombinedPlugin) {
         super(app, plugin);
         this.plugin = plugin;
+    }
+
+    private updateActiveView(callback: (view: BetterGraphView) => void) {
+        const leaves = this.plugin.app.workspace.getLeavesOfType(VIEW_TYPE_GRAPH);
+        leaves.forEach(leaf => {
+            if (leaf.view instanceof BetterGraphView) {
+                callback(leaf.view);
+            }
+        });
     }
 
     display(): void {
@@ -173,8 +183,95 @@ export class CombinedSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
+        // Graph Filters
+        containerEl.createEl('h3', { text: 'Graph Filters' });
+
+        new Setting(containerEl)
+            .setName('Show Tags')
+            .setDesc('Display tags as nodes in the graph')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.showTags)
+                .onChange(async (value) => {
+                    this.plugin.settings.showTags = value;
+                    await this.plugin.saveSettings();
+                    this.updateActiveView(async (view) => {
+                        view.filters.showTags = value;
+                        await view.refresh();
+                    });
+                }));
+
+        new Setting(containerEl)
+            .setName('Show Attachments')
+            .setDesc('Display attachments in the graph')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.showAttachments)
+                .onChange(async (value) => {
+                    this.plugin.settings.showAttachments = value;
+                    await this.plugin.saveSettings();
+                    this.updateActiveView(async (view) => {
+                        view.filters.showAttachments = value;
+                        await view.refresh();
+                    });
+                }));
+
+        new Setting(containerEl)
+            .setName('Existing Files Only')
+            .setDesc('Only show files that exist in the vault')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.existingFilesOnly)
+                .onChange(async (value) => {
+                    this.plugin.settings.existingFilesOnly = value;
+                    await this.plugin.saveSettings();
+                    this.updateActiveView((view) => {
+                        view.filters.existingFilesOnly = value;
+                        if (view.renderer) view.renderer.applyNodeVisibility();
+                    });
+                }));
+
+        new Setting(containerEl)
+            .setName('Show Orphans')
+            .setDesc('Show nodes that have no connections')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.showOrphans)
+                .onChange(async (value) => {
+                    this.plugin.settings.showOrphans = value;
+                    await this.plugin.saveSettings();
+                    this.updateActiveView((view) => {
+                        view.filters.showOrphans = value;
+                        if (view.renderer) view.renderer.applyNodeVisibility();
+                    });
+                }));
+
         // Graph Display Settings
         containerEl.createEl('h3', { text: 'Graph Display' });
+
+        new Setting(containerEl)
+            .setName('Show Arrows')
+            .setDesc('Show direction arrows on links')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.showArrows)
+                .onChange(async (value) => {
+                    this.plugin.settings.showArrows = value;
+                    await this.plugin.saveSettings();
+                    this.updateActiveView(view => {
+                        if (view.renderer) view.renderer.toggleArrows(value);
+                    });
+                }));
+
+        new Setting(containerEl)
+            .setName('Text Fade Threshold')
+            .setDesc('Zoom level at which text fades out')
+            .addSlider(slider => slider
+                .setLimits(0, 1, 0.1)
+                .setValue(this.plugin.settings.textFadeThreshold)
+                .setDynamicTooltip()
+                .onChange(async (value) => {
+                    this.plugin.settings.textFadeThreshold = value;
+                    await this.plugin.saveSettings();
+                    this.updateActiveView(view => {
+                        if (view.renderer) view.renderer.setTextFadeThreshold(value);
+                    });
+                }));
 
         new Setting(containerEl)
             .setName('Node Size')
@@ -186,6 +283,57 @@ export class CombinedSettingTab extends PluginSettingTab {
                 .onChange(async (value) => {
                     this.plugin.settings.nodeSize = value;
                     await this.plugin.saveSettings();
+                    this.updateActiveView(view => {
+                        if (view.renderer) view.renderer.updateNodeSize(value);
+                    });
+                }));
+
+        // Graph Forces
+        containerEl.createEl('h3', { text: 'Graph Forces' });
+
+        new Setting(containerEl)
+            .setName('Center Force')
+            .setDesc('How strongly nodes are pulled to the center')
+            .addSlider(slider => slider
+                .setLimits(0, 1, 0.05)
+                .setValue(this.plugin.settings.centerForce)
+                .setDynamicTooltip()
+                .onChange(async (value) => {
+                    this.plugin.settings.centerForce = value;
+                    await this.plugin.saveSettings();
+                    this.updateActiveView(view => {
+                        if (view.renderer) view.renderer.updateForces();
+                    });
+                }));
+
+        new Setting(containerEl)
+            .setName('Repel Force')
+            .setDesc('How strongly nodes push each other away')
+            .addSlider(slider => slider
+                .setLimits(100, 1000, 50)
+                .setValue(this.plugin.settings.repulsionForce)
+                .setDynamicTooltip()
+                .onChange(async (value) => {
+                    this.plugin.settings.repulsionForce = value;
+                    await this.plugin.saveSettings();
+                    this.updateActiveView(view => {
+                        if (view.renderer) view.renderer.updateForces();
+                    });
+                }));
+
+        new Setting(containerEl)
+            .setName('Link Force')
+            .setDesc('How strongly links pull nodes together')
+            .addSlider(slider => slider
+                .setLimits(0, 1, 0.05)
+                .setValue(this.plugin.settings.linkForce)
+                .setDynamicTooltip()
+                .onChange(async (value) => {
+                    this.plugin.settings.linkForce = value;
+                    await this.plugin.saveSettings();
+                    this.updateActiveView(view => {
+                        if (view.renderer) view.renderer.updateLinkForce(value);
+                    });
                 }));
 
         new Setting(containerEl)
@@ -198,30 +346,9 @@ export class CombinedSettingTab extends PluginSettingTab {
                 .onChange(async (value) => {
                     this.plugin.settings.linkDistance = value;
                     await this.plugin.saveSettings();
-                }));
-
-        new Setting(containerEl)
-            .setName('Repulsion Force')
-            .setDesc('How strongly nodes push each other away')
-            .addSlider(slider => slider
-                .setLimits(100, 1000, 50)
-                .setValue(this.plugin.settings.repulsionForce)
-                .setDynamicTooltip()
-                .onChange(async (value) => {
-                    this.plugin.settings.repulsionForce = value;
-                    await this.plugin.saveSettings();
-                }));
-
-        new Setting(containerEl)
-            .setName('Center Force')
-            .setDesc('How strongly nodes are pulled to the center')
-            .addSlider(slider => slider
-                .setLimits(0, 1, 0.05)
-                .setValue(this.plugin.settings.centerForce)
-                .setDynamicTooltip()
-                .onChange(async (value) => {
-                    this.plugin.settings.centerForce = value;
-                    await this.plugin.saveSettings();
+                    this.updateActiveView(view => {
+                        if (view.renderer) view.renderer.updateForces();
+                    });
                 }));
 
         // Link Thickness Settings
@@ -237,6 +364,9 @@ export class CombinedSettingTab extends PluginSettingTab {
                 .onChange(async (value) => {
                     this.plugin.settings.defaultLinkThickness = value;
                     await this.plugin.saveSettings();
+                    this.updateActiveView(view => {
+                        if (view.renderer) view.renderer.updateLinkThickness(value);
+                    });
                 }));
 
         new Setting(containerEl)
@@ -249,6 +379,9 @@ export class CombinedSettingTab extends PluginSettingTab {
                 .onChange(async (value) => {
                     this.plugin.settings.dottedLinkThickness = value;
                     await this.plugin.saveSettings();
+                    this.updateActiveView(view => {
+                        if (view.renderer) view.renderer.updateDottedLinkSize(value);
+                    });
                 }));
 
         new Setting(containerEl)

@@ -6,16 +6,6 @@ export class GraphControls {
     private container: HTMLElement;
     private plugin: CombinedPlugin;
     private view: BetterGraphView;
-    private isAnimating: boolean = true;
-    
-    // Filter states
-    private filters = {
-        showTags: false,
-        showAttachments: false,
-        existingFilesOnly: true,
-        showOrphans: true,
-        searchQuery: ''
-    };
 
     constructor(container: HTMLElement, plugin: CombinedPlugin, view: BetterGraphView) {
         this.container = container;
@@ -26,318 +16,200 @@ export class GraphControls {
 
     private render() {
         this.container.empty();
-        this.container.addClass('graph-controls');
 
-        // Filters section
-        const filtersSection = this.createSection('Filters', true);
-        
-        // Search
-        const searchContainer = filtersSection.createDiv('search-container');
-        const searchInput = searchContainer.createEl('input', {
-            type: 'text',
-            placeholder: 'Search files...',
-            cls: 'search-input'
-        });
-        const searchIcon = searchContainer.createDiv('search-icon');
-        setIcon(searchIcon, 'search');
-        
-        searchInput.addEventListener('input', (e) => {
-            this.filters.searchQuery = (e.target as HTMLInputElement).value.toLowerCase();
-            this.applyFilters();
-        });
+        // Filters Section
+        this.createSection('Filters', (content) => {
+            // Search
+            const searchContainer = content.createDiv('search-container');
+            const searchInput = searchContainer.createEl('input', {
+                type: 'text',
+                placeholder: 'Search files...',
+                cls: 'search-input'
+            });
+            const searchIcon = searchContainer.createDiv('search-icon');
+            setIcon(searchIcon, 'search');
 
-        // Toggles with actual functionality
-        this.createToggle(filtersSection, 'Tags', this.filters.showTags, async (enabled) => {
-            this.filters.showTags = enabled;
-            this.view.filters.showTags = enabled;
-            await this.view.refresh();
-        });
-        
-        this.createToggle(filtersSection, 'Attachments', this.filters.showAttachments, async (enabled) => {
-            this.filters.showAttachments = enabled;
-            this.view.filters.showAttachments = enabled;
-            await this.view.refresh();
-        });
-        
-        this.createToggle(filtersSection, 'Existing files only', this.filters.existingFilesOnly, (enabled) => {
-            this.filters.existingFilesOnly = enabled;
-            this.applyFilters();
-        });
-        
-        this.createToggle(filtersSection, 'Orphans', this.filters.showOrphans, (enabled) => {
-            this.filters.showOrphans = enabled;
-            this.applyFilters();
-        });
+            // Tags toggle
+            this.createToggle(content, 'Tags', this.plugin.settings.showTags, async (enabled) => {
+                this.plugin.settings.showTags = enabled;
+                this.view.filters.showTags = enabled;
+                await this.plugin.saveSettings();
+                await this.view.refresh();
+            });
 
-        // Groups section
-        const groupsSection = this.createSection('Groups');
-        const newGroupBtn = groupsSection.createEl('button', {
-            text: 'New group',
-            cls: 'mod-cta full-width'
+            // Attachments toggle
+            this.createToggle(content, 'Attachments', this.plugin.settings.showAttachments, async (enabled) => {
+                this.plugin.settings.showAttachments = enabled;
+                this.view.filters.showAttachments = enabled;
+                await this.plugin.saveSettings();
+                await this.view.refresh();
+            });
+
+            // Existing files only
+            this.createToggle(content, 'Existing files only', this.plugin.settings.existingFilesOnly, async (enabled) => {
+                this.plugin.settings.existingFilesOnly = enabled;
+                this.view.filters.existingFilesOnly = enabled;
+                await this.plugin.saveSettings();
+                if (this.view.renderer) this.view.renderer.applyNodeVisibility();
+            });
+
+            // Orphans
+            this.createToggle(content, 'Orphans', this.plugin.settings.showOrphans, async (enabled) => {
+                this.plugin.settings.showOrphans = enabled;
+                this.view.filters.showOrphans = enabled;
+                await this.plugin.saveSettings();
+                if (this.view.renderer) this.view.renderer.applyNodeVisibility();
+            });
         });
 
-        // Display section
-        const displaySection = this.createSection('Display');
-        
-        this.createToggle(displaySection, 'Arrows', false, (enabled) => {
-            // Toggle arrow markers on links
-            if (this.view.renderer) {
-                this.view.renderer.toggleArrows(enabled);
-            }
+        // Groups Section
+        this.createSection('Groups', (content) => {
+            const newGroupBtn = content.createEl('button', {
+                text: 'New group',
+                cls: 'mod-cta'
+            });
+            newGroupBtn.style.width = '100%';
         });
-        
-        this.createSlider(displaySection, 'Text fade threshold', 0, 1, 0.1, 0.5, (value) => {
-            if (this.view.renderer) {
-                this.view.renderer.setTextFadeThreshold(value);
-            }
-        });
-        
-        this.createSlider(displaySection, 'Node size', 
-            5, 30, 1, this.plugin.settings.nodeSize,
-            (value) => {
+
+        // Display Section
+        this.createSection('Display', (content) => {
+            // Arrows
+            this.createToggle(content, 'Arrows', this.plugin.settings.showArrows || false, async (enabled) => {
+                this.plugin.settings.showArrows = enabled;
+                await this.plugin.saveSettings();
+                if (this.view.renderer) this.view.renderer.toggleArrows(enabled);
+            });
+
+            // Text fade threshold
+            this.createSlider(content, 'Text fade threshold', 0, 1, 0.1, 
+                this.plugin.settings.textFadeThreshold || 0.5, async (value) => {
+                this.plugin.settings.textFadeThreshold = value;
+                await this.plugin.saveSettings();
+                if (this.view.renderer) this.view.renderer.setTextFadeThreshold(value);
+            });
+
+            // Node size
+            this.createSlider(content, 'Node size', 5, 30, 1, 
+                this.plugin.settings.nodeSize, async (value) => {
                 this.plugin.settings.nodeSize = value;
-                this.plugin.saveSettings();
-                if (this.view.renderer) {
-                    this.view.renderer.updateNodeSize(value);
-                }
-            }
-        );
-        
-        this.createSlider(displaySection, 'Solid edge thickness',
-            0.5, 5, 0.5, this.plugin.settings.defaultLinkThickness,
-            (value) => {
+                await this.plugin.saveSettings();
+                if (this.view.renderer) this.view.renderer.updateNodeSize(value);
+            });
+
+            // Solid link thickness (labeled as "Link thickness" in UI)
+            this.createSlider(content, 'Link thickness', 0.5, 10, 0.5, 
+                this.plugin.settings.defaultLinkThickness, async (value) => {
                 this.plugin.settings.defaultLinkThickness = value;
-                this.plugin.saveSettings();
-                if (this.view.renderer) {
-                    this.view.renderer.updateLinkThickness(value);
-                }
-            }
-        );
+                await this.plugin.saveSettings();
+                if (this.view.renderer) this.view.renderer.updateLinkThickness(value);
+            });
 
-        const dottedDefault = this.plugin.settings.dottedLinkThickness ?? Math.max(0.5, this.plugin.settings.defaultLinkThickness / 2);
-        this.createSlider(displaySection, 'Dotted edge size',
-            0.5, 4, 0.25, dottedDefault,
-            (value) => {
-                this.plugin.settings.dottedLinkThickness = value;
-                this.plugin.saveSettings();
+            // Animate button
+            const animateBtn = content.createEl('button', {
+                text: 'Animate',
+                cls: 'mod-cta'
+            });
+            animateBtn.style.width = '100%';
+            animateBtn.addEventListener('click', () => {
                 if (this.view.renderer) {
-                    this.view.renderer.updateDottedLinkSize(value);
+                    this.view.renderer.toggleAnimation(true);
                 }
-            }
-        );
-
-        // Animate button
-        const animateBtn = displaySection.createEl('button', {
-            text: this.isAnimating ? 'Stop animation' : 'Animate',
-            cls: this.isAnimating ? 'mod-warning full-width' : 'mod-cta full-width'
-        });
-        animateBtn.addEventListener('click', () => {
-            this.isAnimating = !this.isAnimating;
-            animateBtn.textContent = this.isAnimating ? 'Stop animation' : 'Animate';
-            animateBtn.className = this.isAnimating ? 'mod-warning full-width' : 'mod-cta full-width';
-            if (this.view.renderer) {
-                this.view.renderer.toggleAnimation(this.isAnimating);
-            }
+            });
         });
 
-        // Forces section
-        const forcesSection = this.createSection('Forces');
-        
-        this.createSlider(forcesSection, 'Center force',
-            0, 1, 0.05, this.plugin.settings.centerForce,
-            (value) => {
+        // Forces Section
+        this.createSection('Forces', (content) => {
+            // Center force
+            this.createSlider(content, 'Center force', 0, 1, 0.05, 
+                this.plugin.settings.centerForce, async (value) => {
                 this.plugin.settings.centerForce = value;
-                this.plugin.saveSettings();
-                if (this.view.renderer) {
-                    this.view.renderer.updateForces();
-                }
-            }
-        );
-        
-        this.createSlider(forcesSection, 'Repel force',
-            100, 1000, 50, this.plugin.settings.repulsionForce,
-            (value) => {
+                await this.plugin.saveSettings();
+                if (this.view.renderer) this.view.renderer.updateForces();
+            });
+
+            // Repel force
+            this.createSlider(content, 'Repel force', 100, 1000, 50, 
+                this.plugin.settings.repulsionForce, async (value) => {
                 this.plugin.settings.repulsionForce = value;
-                this.plugin.saveSettings();
-                if (this.view.renderer) {
-                    this.view.renderer.updateForces();
-                }
-            }
-        );
-        
-        this.createSlider(forcesSection, 'Link force',
-            0, 1, 0.05, 0.5, (value) => {
-                if (this.view.renderer) {
-                    this.view.renderer.updateLinkForce(value);
-                }
+                await this.plugin.saveSettings();
+                if (this.view.renderer) this.view.renderer.updateForces();
             });
-        
-        this.createSlider(forcesSection, 'Link distance',
-            20, 200, 10, this.plugin.settings.linkDistance,
-            (value) => {
+
+            // Link force
+            this.createSlider(content, 'Link force', 0, 1, 0.05, 
+                this.plugin.settings.linkForce || 0.5, async (value) => {
+                this.plugin.settings.linkForce = value;
+                await this.plugin.saveSettings();
+                if (this.view.renderer) this.view.renderer.updateLinkForce(value);
+            });
+
+            // Link distance
+            this.createSlider(content, 'Link distance', 20, 200, 10, 
+                this.plugin.settings.linkDistance, async (value) => {
                 this.plugin.settings.linkDistance = value;
-                this.plugin.saveSettings();
-                if (this.view.renderer) {
-                    this.view.renderer.updateForces();
-                }
-            }
-        );
-
-        // Update file count
-        this.updateFileCount();
-    }
-
-    private updateFileCount() {
-        const fileCountEl = this.container.querySelector('.file-count');
-        if (fileCountEl) {
-            const visibleNodes = this.view.nodes.filter(node => !node.hidden);
-            const visibleLinks = this.view.links.filter(link => {
-                const source = typeof link.source === 'string' ? link.source : (link.source as any).id;
-                const target = typeof link.target === 'string' ? link.target : (link.target as any).id;
-                const sourceNode = this.view.nodes.find(n => n.id === source);
-                const targetNode = this.view.nodes.find(n => n.id === target);
-                return sourceNode && targetNode && !sourceNode.hidden && !targetNode.hidden;
+                await this.plugin.saveSettings();
+                if (this.view.renderer) this.view.renderer.updateForces();
             });
-            fileCountEl.setText(`${visibleNodes.length} files, ${visibleLinks.length} links`);
-        } else {
-            // Create file count if it doesn't exist
-            const forcesSection = this.container.querySelector('.control-section:last-child .section-content');
-            if (forcesSection) {
-                const fileCount = forcesSection.createDiv('file-count');
-                const visibleNodes = this.view.nodes.filter(node => !node.hidden);
-                const visibleLinks = this.view.links.filter(link => {
-                    const source = typeof link.source === 'string' ? link.source : (link.source as any).id;
-                    const target = typeof link.target === 'string' ? link.target : (link.target as any).id;
-                    const sourceNode = this.view.nodes.find(n => n.id === source);
-                    const targetNode = this.view.nodes.find(n => n.id === target);
-                    return sourceNode && targetNode && !sourceNode.hidden && !targetNode.hidden;
-                });
-                fileCount.setText(`${visibleNodes.length} files, ${visibleLinks.length} links`);
-            }
-        }
+        });
     }
 
-    private applyFilters() {
-        // Get all files to check orphan status
-        const linkedFiles = new Set<string>();
-        
-        // Collect all linked files
-        this.view.links.forEach(link => {
-            const source = typeof link.source === 'string' ? link.source : (link.source as any).id;
-            const target = typeof link.target === 'string' ? link.target : (link.target as any).id;
-            linkedFiles.add(source);
-            linkedFiles.add(target);
-        });
-
-        // Apply filters to nodes
-        this.view.nodes.forEach(node => {
-            let shouldShow = true;
-
-            // Search filter
-            if (this.filters.searchQuery && !node.name.toLowerCase().includes(this.filters.searchQuery)) {
-                shouldShow = false;
-            }
-
-            // Check node type
-            if (node.type === 'tag') {
-                shouldShow = shouldShow && this.filters.showTags;
-            } else if (node.type === 'attachment') {
-                shouldShow = shouldShow && this.filters.showAttachments;
-            } else {
-                // File nodes
-                const file = this.plugin.app.vault.getAbstractFileByPath(node.path);
-                if (file) {
-                    // Check orphan status for markdown files
-                    const isOrphan = !linkedFiles.has(node.id);
-                    if (isOrphan && !this.filters.showOrphans) {
-                        shouldShow = false;
-                    }
-                } else if (this.filters.existingFilesOnly) {
-                    // File doesn't exist
-                    shouldShow = false;
-                }
-            }
-
-            node.hidden = !shouldShow;
-        });
-
-        // Update the graph visualization
-        if (this.view.renderer) {
-            this.view.renderer.applyNodeVisibility();
-        }
-
-        // Update file count
-        this.updateFileCount();
-    }
-
-    private createSection(title: string, expanded: boolean = false): HTMLElement {
+    private createSection(title: string, buildContent: (content: HTMLElement) => void) {
         const section = this.container.createDiv('control-section');
         const header = section.createDiv('section-header');
         
-        const toggle = header.createDiv('section-toggle');
-        setIcon(toggle, expanded ? 'chevron-down' : 'chevron-right');
+        const chevron = header.createDiv('section-chevron');
+        setIcon(chevron, 'chevron-right');
         
         header.createSpan({ text: title, cls: 'section-title' });
         
         const content = section.createDiv('section-content');
-        content.style.display = expanded ? 'block' : 'none';
+        content.style.display = 'none';
         
-        header.addEventListener('click', () => {
-            const isExpanded = content.style.display === 'block';
-            content.style.display = isExpanded ? 'none' : 'block';
-            setIcon(toggle, isExpanded ? 'chevron-right' : 'chevron-down');
-        });
-        
-        return content;
-    }
-
-    private createToggle(parent: HTMLElement, label: string, checked: boolean, onChange?: (enabled: boolean) => void | Promise<void>): HTMLElement {
-        const container = parent.createDiv('toggle-container');
-        container.createEl('label', { text: label });
-        const toggle = container.createDiv('toggle');
-        toggle.classList.toggle('is-enabled', checked);
-        
-        toggle.addEventListener('click', async () => {
-            const isEnabled = !toggle.classList.contains('is-enabled');
-            toggle.classList.toggle('is-enabled', isEnabled);
-            if (onChange) {
-                await onChange(isEnabled);
-            }
-        });
-        
-        return container;
-    }
-
-    private createSlider(
-        parent: HTMLElement,
-        label: string,
-        min: number,
-        max: number,
-        step: number,
-        value: number,
-        onChange?: (value: number) => void
-    ): HTMLElement {
-        const container = parent.createDiv('slider-container');
-        container.createEl('label', { text: label });
-        
-        const sliderWrapper = container.createDiv('slider-wrapper');
-        const slider = sliderWrapper.createEl('input', {
-            type: 'range',
-            attr: { min: min.toString(), max: max.toString(), step: step.toString() }
-        }) as HTMLInputElement;
-        slider.value = value.toString();
-        
-        const valueDisplay = container.createDiv('slider-value');
-        valueDisplay.setText(value.toFixed(step < 1 ? 2 : 0));
-        
-        if (onChange) {
-            slider.addEventListener('input', (e) => {
-                const newValue = parseFloat((e.target as HTMLInputElement).value);
-                valueDisplay.setText(newValue.toFixed(step < 1 ? 2 : 0));
-                onChange(newValue);
-            });
+        // Filters starts expanded
+        if (title === 'Filters') {
+            content.style.display = 'block';
+            setIcon(chevron, 'chevron-down');
         }
         
-        return container;
+        header.addEventListener('click', () => {
+            const isOpen = content.style.display === 'block';
+            content.style.display = isOpen ? 'none' : 'block';
+            setIcon(chevron, isOpen ? 'chevron-right' : 'chevron-down');
+        });
+        
+        buildContent(content);
+    }
+
+    private createToggle(parent: HTMLElement, label: string, checked: boolean, onChange: (enabled: boolean) => void) {
+        const container = parent.createDiv('toggle-container');
+        container.createEl('span', { text: label });
+        
+        const toggle = container.createDiv('checkbox-container');
+        toggle.classList.toggle('is-enabled', checked);
+        
+        toggle.addEventListener('click', () => {
+            const newValue = !toggle.classList.contains('is-enabled');
+            toggle.classList.toggle('is-enabled', newValue);
+            onChange(newValue);
+        });
+    }
+
+    private createSlider(parent: HTMLElement, label: string, min: number, max: number, step: number, 
+        value: number, onChange: (value: number) => void) {
+        const container = parent.createDiv('slider-container');
+        container.createEl('span', { text: label, cls: 'slider-label' });
+        
+        const slider = container.createEl('input', {
+            type: 'range',
+            cls: 'slider'
+        }) as HTMLInputElement;
+        slider.min = min.toString();
+        slider.max = max.toString();
+        slider.step = step.toString();
+        slider.value = value.toString();
+        
+        slider.addEventListener('input', () => {
+            onChange(parseFloat(slider.value));
+        });
     }
 }

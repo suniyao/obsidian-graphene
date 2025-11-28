@@ -27,7 +27,16 @@ export interface BetterGraphSettings {
     linkDistance: number;
     repulsionForce: number;
     centerForce: number;
+    linkForce: number; // Added
+    showArrows: boolean; // Added
+    textFadeThreshold: number; // Added
     
+    // Filters
+    showTags: boolean; // Added
+    showAttachments: boolean; // Added
+    existingFilesOnly: boolean; // Added
+    showOrphans: boolean; // Added
+
     // Link Appearance
     defaultLinkThickness: number;
     minLinkThickness: number;
@@ -61,7 +70,16 @@ export const DEFAULT_SETTINGS: BetterGraphSettings = {
     linkDistance: 80,      // Reduced from 100
     repulsionForce: 500,   // Increased from 300
     centerForce: 0.1,      // Reduced from 0.3
+    linkForce: 0.5,        // Added default
+    showArrows: false,     // Added default
+    textFadeThreshold: 0.5, // Added default
     
+    // Filters
+    showTags: false,       // Added default
+    showAttachments: false, // Added default
+    existingFilesOnly: true, // Added default
+    showOrphans: true,     // Added default
+
     // Link Appearance
     defaultLinkThickness: 2,
     minLinkThickness: 0.5,
