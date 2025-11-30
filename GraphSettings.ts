@@ -24,57 +24,44 @@ export class CombinedSettingTab extends PluginSettingTab {
     display(): void {
         const { containerEl } = this;
 
-        // API Configuration Section
-        containerEl.createEl('h3', { text: 'API Configuration' });
+        // new Setting(containerEl)
+        //     .setName('Pinecone API Key')
+        //     .setDesc('Optional: For cloud storage of embeddings')
+        //     .addText(text => text
+        //         .setPlaceholder('Your Pinecone API key')
+        //         .setValue(this.plugin.settings.pineconeApiKey)
+        //         .onChange(async (value) => {
+        //             this.plugin.settings.pineconeApiKey = value;
+        //             await this.plugin.saveSettings();
+        //         }));
 
-        new Setting(containerEl)
-            .setName('OpenAI API Key')
-            .setDesc('Required for generating semantic embeddings and AI summaries')
-            .addText(text => text
-                .setPlaceholder('sk-...')
-                .setValue(this.plugin.settings.openaiApiKey)
-                .onChange(async (value) => {
-                    this.plugin.settings.openaiApiKey = value;
-                    await this.plugin.saveSettings();
-                }));
+        // new Setting(containerEl)
+        //     .setName('Pinecone Environment')
+        //     .setDesc('Your Pinecone environment (e.g., us-west1-gcp)')
+        //     .addText(text => text
+        //         .setPlaceholder('us-west1-gcp')
+        //         .setValue(this.plugin.settings.pineconeEnvironment)
+        //         .onChange(async (value) => {
+        //             this.plugin.settings.pineconeEnvironment = value;
+        //             await this.plugin.saveSettings();
+        //         }));
 
-        new Setting(containerEl)
-            .setName('Pinecone API Key')
-            .setDesc('Optional: For cloud storage of embeddings')
-            .addText(text => text
-                .setPlaceholder('Your Pinecone API key')
-                .setValue(this.plugin.settings.pineconeApiKey)
-                .onChange(async (value) => {
-                    this.plugin.settings.pineconeApiKey = value;
-                    await this.plugin.saveSettings();
-                }));
-
-        new Setting(containerEl)
-            .setName('Pinecone Environment')
-            .setDesc('Your Pinecone environment (e.g., us-west1-gcp)')
-            .addText(text => text
-                .setPlaceholder('us-west1-gcp')
-                .setValue(this.plugin.settings.pineconeEnvironment)
-                .onChange(async (value) => {
-                    this.plugin.settings.pineconeEnvironment = value;
-                    await this.plugin.saveSettings();
-                }));
-
-        new Setting(containerEl)
-            .setName('Pinecone Index Name')
-            .setDesc('Your Pinecone index name')
-            .addText(text => text
-                .setPlaceholder('obsidian-notes')
-                .setValue(this.plugin.settings.pineconeIndexName)
-                .onChange(async (value) => {
-                    this.plugin.settings.pineconeIndexName = value;
-                    await this.plugin.saveSettings();
-                }));
+        // new Setting(containerEl)
+        //     .setName('Pinecone Index Name')
+        //     .setDesc('Your Pinecone index name')
+        //     .addText(text => text
+        //         .setPlaceholder('obsidian-notes')
+        //         .setValue(this.plugin.settings.pineconeIndexName)
+        //         .onChange(async (value) => {
+        //             this.plugin.settings.pineconeIndexName = value;
+        //             await this.plugin.saveSettings();
+        //         }));
 
         // Embedding Settings Section
         containerEl.createEl('h3', { text: 'Embedding Settings' });
 
         // Provider selector: OpenAI vs Local
+
         new Setting(containerEl)
             .setName('Embedding Provider')
             .setDesc('Choose how embeddings are generated')
@@ -90,6 +77,17 @@ export class CombinedSettingTab extends PluginSettingTab {
                     new Notice(`Embedding provider set to ${useLocal ? 'Local' : 'OpenAI'}`);
                 });
             });
+        
+        new Setting(containerEl)
+            .setName('OpenAI API Key')
+            .setDesc('Required for generating semantic embeddings and AI summaries')
+            .addText(text => text
+                .setPlaceholder('sk-...')
+                .setValue(this.plugin.settings.openaiApiKey)
+                .onChange(async (value) => {
+                    this.plugin.settings.openaiApiKey = value;
+                    await this.plugin.saveSettings();
+                }));
 
         // Local endpoint configuration
         new Setting(containerEl)
@@ -184,229 +182,229 @@ export class CombinedSettingTab extends PluginSettingTab {
                 }));
 
         // Graph Filters
-        containerEl.createEl('h3', { text: 'Graph Filters' });
+        // containerEl.createEl('h3', { text: 'Graph Filters' });
 
-        new Setting(containerEl)
-            .setName('Show Tags')
-            .setDesc('Display tags as nodes in the graph')
-            .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.showTags)
-                .onChange(async (value) => {
-                    this.plugin.settings.showTags = value;
-                    await this.plugin.saveSettings();
-                    this.updateActiveView(async (view) => {
-                        view.filters.showTags = value;
-                        await view.refresh();
-                    });
-                }));
+        // new Setting(containerEl)
+        //     .setName('Show Tags')
+        //     .setDesc('Display tags as nodes in the graph')
+        //     .addToggle(toggle => toggle
+        //         .setValue(this.plugin.settings.showTags)
+        //         .onChange(async (value) => {
+        //             this.plugin.settings.showTags = value;
+        //             await this.plugin.saveSettings();
+        //             this.updateActiveView(async (view) => {
+        //                 view.filters.showTags = value;
+        //                 await view.refresh();
+        //             });
+        //         }));
 
-        new Setting(containerEl)
-            .setName('Show Attachments')
-            .setDesc('Display attachments in the graph')
-            .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.showAttachments)
-                .onChange(async (value) => {
-                    this.plugin.settings.showAttachments = value;
-                    await this.plugin.saveSettings();
-                    this.updateActiveView(async (view) => {
-                        view.filters.showAttachments = value;
-                        await view.refresh();
-                    });
-                }));
+        // new Setting(containerEl)
+        //     .setName('Show Attachments')
+        //     .setDesc('Display attachments in the graph')
+        //     .addToggle(toggle => toggle
+        //         .setValue(this.plugin.settings.showAttachments)
+        //         .onChange(async (value) => {
+        //             this.plugin.settings.showAttachments = value;
+        //             await this.plugin.saveSettings();
+        //             this.updateActiveView(async (view) => {
+        //                 view.filters.showAttachments = value;
+        //                 await view.refresh();
+        //             });
+        //         }));
 
-        new Setting(containerEl)
-            .setName('Existing Files Only')
-            .setDesc('Only show files that exist in the vault')
-            .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.existingFilesOnly)
-                .onChange(async (value) => {
-                    this.plugin.settings.existingFilesOnly = value;
-                    await this.plugin.saveSettings();
-                    this.updateActiveView((view) => {
-                        view.filters.existingFilesOnly = value;
-                        if (view.renderer) view.renderer.applyNodeVisibility();
-                    });
-                }));
+        // new Setting(containerEl)
+        //     .setName('Existing Files Only')
+        //     .setDesc('Only show files that exist in the vault')
+        //     .addToggle(toggle => toggle
+        //         .setValue(this.plugin.settings.existingFilesOnly)
+        //         .onChange(async (value) => {
+        //             this.plugin.settings.existingFilesOnly = value;
+        //             await this.plugin.saveSettings();
+        //             this.updateActiveView((view) => {
+        //                 view.filters.existingFilesOnly = value;
+        //                 if (view.renderer) view.renderer.applyNodeVisibility();
+        //             });
+        //         }));
 
-        new Setting(containerEl)
-            .setName('Show Orphans')
-            .setDesc('Show nodes that have no connections')
-            .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.showOrphans)
-                .onChange(async (value) => {
-                    this.plugin.settings.showOrphans = value;
-                    await this.plugin.saveSettings();
-                    this.updateActiveView((view) => {
-                        view.filters.showOrphans = value;
-                        if (view.renderer) view.renderer.applyNodeVisibility();
-                    });
-                }));
+        // new Setting(containerEl)
+        //     .setName('Show Orphans')
+        //     .setDesc('Show nodes that have no connections')
+        //     .addToggle(toggle => toggle
+        //         .setValue(this.plugin.settings.showOrphans)
+        //         .onChange(async (value) => {
+        //             this.plugin.settings.showOrphans = value;
+        //             await this.plugin.saveSettings();
+        //             this.updateActiveView((view) => {
+        //                 view.filters.showOrphans = value;
+        //                 if (view.renderer) view.renderer.applyNodeVisibility();
+        //             });
+        //         }));
 
         // Graph Display Settings
-        containerEl.createEl('h3', { text: 'Graph Display' });
+        // containerEl.createEl('h3', { text: 'Graph Display' });
 
-        new Setting(containerEl)
-            .setName('Show Arrows')
-            .setDesc('Show direction arrows on links')
-            .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.showArrows)
-                .onChange(async (value) => {
-                    this.plugin.settings.showArrows = value;
-                    await this.plugin.saveSettings();
-                    this.updateActiveView(view => {
-                        if (view.renderer) view.renderer.toggleArrows(value);
-                    });
-                }));
+        // new Setting(containerEl)
+        //     .setName('Show Arrows')
+        //     .setDesc('Show direction arrows on links')
+        //     .addToggle(toggle => toggle
+        //         .setValue(this.plugin.settings.showArrows)
+        //         .onChange(async (value) => {
+        //             this.plugin.settings.showArrows = value;
+        //             await this.plugin.saveSettings();
+        //             this.updateActiveView(view => {
+        //                 if (view.renderer) view.renderer.toggleArrows(value);
+        //             });
+        //         }));
 
-        new Setting(containerEl)
-            .setName('Text Fade Threshold')
-            .setDesc('Zoom level at which text fades out')
-            .addSlider(slider => slider
-                .setLimits(0, 1, 0.1)
-                .setValue(this.plugin.settings.textFadeThreshold)
-                .setDynamicTooltip()
-                .onChange(async (value) => {
-                    this.plugin.settings.textFadeThreshold = value;
-                    await this.plugin.saveSettings();
-                    this.updateActiveView(view => {
-                        if (view.renderer) view.renderer.setTextFadeThreshold(value);
-                    });
-                }));
+        // new Setting(containerEl)
+        //     .setName('Text Fade Threshold')
+        //     .setDesc('Zoom level at which text fades out')
+        //     .addSlider(slider => slider
+        //         .setLimits(0, 1, 0.1)
+        //         .setValue(this.plugin.settings.textFadeThreshold)
+        //         .setDynamicTooltip()
+        //         .onChange(async (value) => {
+        //             this.plugin.settings.textFadeThreshold = value;
+        //             await this.plugin.saveSettings();
+        //             this.updateActiveView(view => {
+        //                 if (view.renderer) view.renderer.setTextFadeThreshold(value);
+        //             });
+        //         }));
 
-        new Setting(containerEl)
-            .setName('Node Size')
-            .setDesc('Size of nodes in the graph')
-            .addSlider(slider => slider
-                .setLimits(5, 30, 1)
-                .setValue(this.plugin.settings.nodeSize)
-                .setDynamicTooltip()
-                .onChange(async (value) => {
-                    this.plugin.settings.nodeSize = value;
-                    await this.plugin.saveSettings();
-                    this.updateActiveView(view => {
-                        if (view.renderer) view.renderer.updateNodeSize(value);
-                    });
-                }));
+        // new Setting(containerEl)
+        //     .setName('Node Size')
+        //     .setDesc('Size of nodes in the graph')
+        //     .addSlider(slider => slider
+        //         .setLimits(5, 30, 1)
+        //         .setValue(this.plugin.settings.nodeSize)
+        //         .setDynamicTooltip()
+        //         .onChange(async (value) => {
+        //             this.plugin.settings.nodeSize = value;
+        //             await this.plugin.saveSettings();
+        //             this.updateActiveView(view => {
+        //                 if (view.renderer) view.renderer.updateNodeSize(value);
+        //             });
+        //         }));
 
         // Graph Forces
-        containerEl.createEl('h3', { text: 'Graph Forces' });
+        // containerEl.createEl('h3', { text: 'Graph Forces' });
 
-        new Setting(containerEl)
-            .setName('Center Force')
-            .setDesc('How strongly nodes are pulled to the center')
-            .addSlider(slider => slider
-                .setLimits(0, 1, 0.05)
-                .setValue(this.plugin.settings.centerForce)
-                .setDynamicTooltip()
-                .onChange(async (value) => {
-                    this.plugin.settings.centerForce = value;
-                    await this.plugin.saveSettings();
-                    this.updateActiveView(view => {
-                        if (view.renderer) view.renderer.updateForces();
-                    });
-                }));
+        // new Setting(containerEl)
+        //     .setName('Center Force')
+        //     .setDesc('How strongly nodes are pulled to the center')
+        //     .addSlider(slider => slider
+        //         .setLimits(0, 1, 0.05)
+        //         .setValue(this.plugin.settings.centerForce)
+        //         .setDynamicTooltip()
+        //         .onChange(async (value) => {
+        //             this.plugin.settings.centerForce = value;
+        //             await this.plugin.saveSettings();
+        //             this.updateActiveView(view => {
+        //                 if (view.renderer) view.renderer.updateForces();
+        //             });
+        //         }));
 
-        new Setting(containerEl)
-            .setName('Repel Force')
-            .setDesc('How strongly nodes push each other away')
-            .addSlider(slider => slider
-                .setLimits(100, 3000, 100)
-                .setValue(this.plugin.settings.repulsionForce)
-                .setDynamicTooltip()
-                .onChange(async (value) => {
-                    this.plugin.settings.repulsionForce = value;
-                    await this.plugin.saveSettings();
-                    this.updateActiveView(view => {
-                        if (view.renderer) view.renderer.updateForces();
-                    });
-                }));
+        // new Setting(containerEl)
+        //     .setName('Repel Force')
+        //     .setDesc('How strongly nodes push each other away')
+        //     .addSlider(slider => slider
+        //         .setLimits(100, 3000, 100)
+        //         .setValue(this.plugin.settings.repulsionForce)
+        //         .setDynamicTooltip()
+        //         .onChange(async (value) => {
+        //             this.plugin.settings.repulsionForce = value;
+        //             await this.plugin.saveSettings();
+        //             this.updateActiveView(view => {
+        //                 if (view.renderer) view.renderer.updateForces();
+        //             });
+        //         }));
 
-        new Setting(containerEl)
-            .setName('Link Force')
-            .setDesc('How strongly links pull nodes together')
-            .addSlider(slider => slider
-                .setLimits(0, 1, 0.05)
-                .setValue(this.plugin.settings.linkForce)
-                .setDynamicTooltip()
-                .onChange(async (value) => {
-                    this.plugin.settings.linkForce = value;
-                    await this.plugin.saveSettings();
-                    this.updateActiveView(view => {
-                        if (view.renderer) view.renderer.updateLinkForce(value);
-                    });
-                }));
+        // new Setting(containerEl)
+        //     .setName('Link Force')
+        //     .setDesc('How strongly links pull nodes together')
+        //     .addSlider(slider => slider
+        //         .setLimits(0, 1, 0.05)
+        //         .setValue(this.plugin.settings.linkForce)
+        //         .setDynamicTooltip()
+        //         .onChange(async (value) => {
+        //             this.plugin.settings.linkForce = value;
+        //             await this.plugin.saveSettings();
+        //             this.updateActiveView(view => {
+        //                 if (view.renderer) view.renderer.updateLinkForce(value);
+        //             });
+        //         }));
 
-        new Setting(containerEl)
-            .setName('Link Distance')
-            .setDesc('Default distance between connected nodes')
-            .addSlider(slider => slider
-                .setLimits(20, 500, 10)
-                .setValue(this.plugin.settings.linkDistance)
-                .setDynamicTooltip()
-                .onChange(async (value) => {
-                    this.plugin.settings.linkDistance = value;
-                    await this.plugin.saveSettings();
-                    this.updateActiveView(view => {
-                        if (view.renderer) view.renderer.updateForces();
-                    });
-                }));
+        // new Setting(containerEl)
+        //     .setName('Link Distance')
+        //     .setDesc('Default distance between connected nodes')
+        //     .addSlider(slider => slider
+        //         .setLimits(20, 500, 10)
+        //         .setValue(this.plugin.settings.linkDistance)
+        //         .setDynamicTooltip()
+        //         .onChange(async (value) => {
+        //             this.plugin.settings.linkDistance = value;
+        //             await this.plugin.saveSettings();
+        //             this.updateActiveView(view => {
+        //                 if (view.renderer) view.renderer.updateForces();
+        //             });
+        //         }));
 
         // Link Thickness Settings
-        containerEl.createEl('h3', { text: 'Edge Thickness' });
+        // containerEl.createEl('h3', { text: 'Edge Thickness' });
 
-        new Setting(containerEl)
-            .setName('Solid edge thickness')
-            .setDesc('Thickness for manual/tag edges')
-            .addSlider(slider => slider
-                .setLimits(0.5, 10, 0.5)
-                .setValue(this.plugin.settings.defaultLinkThickness)
-                .setDynamicTooltip()
-                .onChange(async (value) => {
-                    this.plugin.settings.defaultLinkThickness = value;
-                    await this.plugin.saveSettings();
-                    this.updateActiveView(view => {
-                        if (view.renderer) view.renderer.updateLinkThickness(value);
-                    });
-                }));
+        // new Setting(containerEl)
+        //     .setName('Solid edge thickness')
+        //     .setDesc('Thickness for manual/tag edges')
+        //     .addSlider(slider => slider
+        //         .setLimits(0.5, 10, 0.5)
+        //         .setValue(this.plugin.settings.defaultLinkThickness)
+        //         .setDynamicTooltip()
+        //         .onChange(async (value) => {
+        //             this.plugin.settings.defaultLinkThickness = value;
+        //             await this.plugin.saveSettings();
+        //             this.updateActiveView(view => {
+        //                 if (view.renderer) view.renderer.updateLinkThickness(value);
+        //             });
+        //         }));
 
-        new Setting(containerEl)
-            .setName('Dotted edge size')
-            .setDesc('Dot radius for similarity edges')
-            .addSlider(slider => slider
-                .setLimits(0.5, 4, 0.25)
-                .setValue(this.plugin.settings.dottedLinkThickness ?? Math.max(0.5, this.plugin.settings.defaultLinkThickness / 2))
-                .setDynamicTooltip()
-                .onChange(async (value) => {
-                    this.plugin.settings.dottedLinkThickness = value;
-                    await this.plugin.saveSettings();
-                    this.updateActiveView(view => {
-                        if (view.renderer) view.renderer.updateDottedLinkSize(value);
-                    });
-                }));
+        // new Setting(containerEl)
+        //     .setName('Dotted edge size')
+        //     .setDesc('Dot radius for similarity edges')
+        //     .addSlider(slider => slider
+        //         .setLimits(0.5, 4, 0.25)
+        //         .setValue(this.plugin.settings.dottedLinkThickness ?? Math.max(0.5, this.plugin.settings.defaultLinkThickness / 2))
+        //         .setDynamicTooltip()
+        //         .onChange(async (value) => {
+        //             this.plugin.settings.dottedLinkThickness = value;
+        //             await this.plugin.saveSettings();
+        //             this.updateActiveView(view => {
+        //                 if (view.renderer) view.renderer.updateDottedLinkSize(value);
+        //             });
+        //         }));
 
-        new Setting(containerEl)
-            .setName('Minimum Link Thickness')
-            .setDesc('Minimum thickness for similarity-based links')
-            .addSlider(slider => slider
-                .setLimits(0.1, 5, 0.1)
-                .setValue(this.plugin.settings.minLinkThickness)
-                .setDynamicTooltip()
-                .onChange(async (value) => {
-                    this.plugin.settings.minLinkThickness = value;
-                    await this.plugin.saveSettings();
-                }));
+        // new Setting(containerEl)
+        //     .setName('Minimum Link Thickness')
+        //     .setDesc('Minimum thickness for similarity-based links')
+        //     .addSlider(slider => slider
+        //         .setLimits(0.1, 5, 0.1)
+        //         .setValue(this.plugin.settings.minLinkThickness)
+        //         .setDynamicTooltip()
+        //         .onChange(async (value) => {
+        //             this.plugin.settings.minLinkThickness = value;
+        //             await this.plugin.saveSettings();
+        //         }));
 
-        new Setting(containerEl)
-            .setName('Maximum Link Thickness')
-            .setDesc('Maximum thickness for similarity-based links')
-            .addSlider(slider => slider
-                .setLimits(2, 15, 0.5)
-                .setValue(this.plugin.settings.maxLinkThickness)
-                .setDynamicTooltip()
-                .onChange(async (value) => {
-                    this.plugin.settings.maxLinkThickness = value;
-                    await this.plugin.saveSettings();
-                }));
+        // new Setting(containerEl)
+        //     .setName('Maximum Link Thickness')
+        //     .setDesc('Maximum thickness for similarity-based links')
+        //     .addSlider(slider => slider
+        //         .setLimits(2, 15, 0.5)
+        //         .setValue(this.plugin.settings.maxLinkThickness)
+        //         .setDynamicTooltip()
+        //         .onChange(async (value) => {
+        //             this.plugin.settings.maxLinkThickness = value;
+        //             await this.plugin.saveSettings();
+        //         }));
 
         // Actions Section
         containerEl.createEl('h3', { text: 'Actions' });

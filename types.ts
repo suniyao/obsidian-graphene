@@ -5,9 +5,9 @@ export interface LinkThickness {
 export interface BetterGraphSettings {
     // API Keys
     openaiApiKey: string;
-    pineconeApiKey: string;
-    pineconeEnvironment: string;
-    pineconeIndexName: string;
+    // pineconeApiKey: string;
+    // pineconeEnvironment: string;
+    // pineconeIndexName: string;
     
     // Embedding Settings
     useEmbeddings: boolean;
@@ -49,9 +49,9 @@ export interface BetterGraphSettings {
 export const DEFAULT_SETTINGS: BetterGraphSettings = {
     // API Keys
     openaiApiKey: '',
-    pineconeApiKey: '',
-    pineconeEnvironment: '',
-    pineconeIndexName: '',
+    // pineconeApiKey: '',
+    // pineconeEnvironment: '',
+    // pineconeIndexName: '',
     
     // Embedding Settings
     useEmbeddings: false,

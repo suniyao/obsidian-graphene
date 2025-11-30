@@ -58,13 +58,23 @@ export class GraphControls {
                 await this.plugin.saveSettings();
             });
 
-            // Solid link thickness (labeled as "Link thickness" in UI)
-            this.createSlider(content, 'Link thickness', 0.5, 10, 0.5, 
+            // Solid link thickness
+            this.createSlider(content, 'Solid Link Thickness', 0.5, 10, 0.5, 
                 this.plugin.settings.defaultLinkThickness, (value) => {
                 this.plugin.settings.defaultLinkThickness = value;
                 if (this.view.renderer) this.view.renderer.updateLinkThickness(value);
             }, async (value) => {
                 this.plugin.settings.defaultLinkThickness = value;
+                await this.plugin.saveSettings();
+            });
+
+            // Dotted link thickness
+            this.createSlider(content, 'Dotted Link Thickness', 0.5, 4, 0.25, 
+                this.plugin.settings.dottedLinkThickness ?? Math.max(0.5, this.plugin.settings.defaultLinkThickness / 2), (value) => {
+                this.plugin.settings.dottedLinkThickness = value;
+                if (this.view.renderer) this.view.renderer.updateDottedLinkSize(value);
+            }, async (value) => {
+                this.plugin.settings.dottedLinkThickness = value;
                 await this.plugin.saveSettings();
             });
 
