@@ -310,7 +310,7 @@ export class CombinedSettingTab extends PluginSettingTab {
             .setName('Repel Force')
             .setDesc('How strongly nodes push each other away')
             .addSlider(slider => slider
-                .setLimits(100, 1000, 50)
+                .setLimits(100, 3000, 100)
                 .setValue(this.plugin.settings.repulsionForce)
                 .setDynamicTooltip()
                 .onChange(async (value) => {
@@ -340,7 +340,7 @@ export class CombinedSettingTab extends PluginSettingTab {
             .setName('Link Distance')
             .setDesc('Default distance between connected nodes')
             .addSlider(slider => slider
-                .setLimits(20, 200, 10)
+                .setLimits(20, 500, 10)
                 .setValue(this.plugin.settings.linkDistance)
                 .setDynamicTooltip()
                 .onChange(async (value) => {

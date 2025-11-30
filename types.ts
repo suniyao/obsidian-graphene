@@ -30,6 +30,7 @@ export interface BetterGraphSettings {
     linkForce: number; // Added
     showArrows: boolean; // Added
     textFadeThreshold: number; // Added
+    showParticleAnimation: boolean; // Added
     
     // Filters
     showTags: boolean; // Added
@@ -73,6 +74,7 @@ export const DEFAULT_SETTINGS: BetterGraphSettings = {
     linkForce: 0.5,        // Added default
     showArrows: false,     // Added default
     textFadeThreshold: 0.5, // Added default
+    showParticleAnimation: true, // Added default
     
     // Filters
     showTags: false,       // Added default

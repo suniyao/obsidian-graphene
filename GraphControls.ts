@@ -17,8 +17,38 @@ export class GraphControls {
     private render() {
         this.container.empty();
 
-        // Filters Section
+        // Filters Section (with action buttons aligned right)
         this.createSection('Filters', (content) => {
+            // Header with buttons on the right
+            const headerRow = content.createDiv('filters-header');
+            headerRow.style.display = 'flex';
+            headerRow.style.justifyContent = 'space-between';
+            headerRow.style.alignItems = 'center';
+            headerRow.style.marginBottom = '12px';
+            
+            const buttonsContainer = headerRow.createDiv('filters-actions');
+            buttonsContainer.style.display = 'flex';
+            buttonsContainer.style.gap = '8px';
+            
+            // Reset button
+            const resetButton = buttonsContainer.createDiv('reset-button');
+            resetButton.style.cursor = 'pointer';
+            resetButton.style.padding = '4px 8px';
+            resetButton.style.borderRadius = '3px';
+            resetButton.style.backgroundColor = 'var(--interactive-normal)';
+            resetButton.style.fontSize = '12px';
+            resetButton.title = 'Reset filters';
+            setIcon(resetButton, 'rotate-ccw');
+            
+            // Close button
+            const closeButton = buttonsContainer.createDiv('close-button');
+            closeButton.style.cursor = 'pointer';
+            closeButton.style.padding = '4px';
+            closeButton.style.borderRadius = '3px';
+            closeButton.style.backgroundColor = 'var(--interactive-normal)';
+            closeButton.title = 'Close';
+            setIcon(closeButton, 'x');
+
             // Search
             const searchContainer = content.createDiv('search-container');
             const searchInput = searchContainer.createEl('input', {
@@ -81,27 +111,33 @@ export class GraphControls {
             });
 
             // Text fade threshold
-            this.createSlider(content, 'Text fade threshold', 0, 1, 0.1, 
-                this.plugin.settings.textFadeThreshold || 0.5, async (value) => {
+            this.createSlider(content, 'Text fade threshold', 0.2, 2.0, 0.1, 
+                this.plugin.settings.textFadeThreshold || 0.7, (value) => {
+                this.plugin.settings.textFadeThreshold = value;
+                if (this.view.renderer) this.view.renderer.setTextFadeThreshold(value);
+            }, async (value) => {
                 this.plugin.settings.textFadeThreshold = value;
                 await this.plugin.saveSettings();
-                if (this.view.renderer) this.view.renderer.setTextFadeThreshold(value);
             });
 
             // Node size
             this.createSlider(content, 'Node size', 5, 30, 1, 
-                this.plugin.settings.nodeSize, async (value) => {
+                this.plugin.settings.nodeSize, (value) => {
+                this.plugin.settings.nodeSize = value;
+                if (this.view.renderer) this.view.renderer.updateNodeSize(value);
+            }, async (value) => {
                 this.plugin.settings.nodeSize = value;
                 await this.plugin.saveSettings();
-                if (this.view.renderer) this.view.renderer.updateNodeSize(value);
             });
 
             // Solid link thickness (labeled as "Link thickness" in UI)
             this.createSlider(content, 'Link thickness', 0.5, 10, 0.5, 
-                this.plugin.settings.defaultLinkThickness, async (value) => {
+                this.plugin.settings.defaultLinkThickness, (value) => {
+                this.plugin.settings.defaultLinkThickness = value;
+                if (this.view.renderer) this.view.renderer.updateLinkThickness(value);
+            }, async (value) => {
                 this.plugin.settings.defaultLinkThickness = value;
                 await this.plugin.saveSettings();
-                if (this.view.renderer) this.view.renderer.updateLinkThickness(value);
             });
 
             // Animate button
@@ -115,40 +151,55 @@ export class GraphControls {
                     this.view.renderer.toggleAnimation(true);
                 }
             });
+
+            // Particle Animation
+            this.createToggle(content, 'Particle Animation', this.plugin.settings.showParticleAnimation !== false, async (enabled) => {
+                this.plugin.settings.showParticleAnimation = enabled;
+                await this.plugin.saveSettings();
+                if (this.view.renderer) this.view.renderer.toggleParticleAnimation(enabled);
+            });
         });
 
         // Forces Section
         this.createSection('Forces', (content) => {
             // Center force
             this.createSlider(content, 'Center force', 0, 1, 0.05, 
-                this.plugin.settings.centerForce, async (value) => {
+                this.plugin.settings.centerForce, (value) => {
+                this.plugin.settings.centerForce = value;
+                if (this.view.renderer) this.view.renderer.updateForces();
+            }, async (value) => {
                 this.plugin.settings.centerForce = value;
                 await this.plugin.saveSettings();
-                if (this.view.renderer) this.view.renderer.updateForces();
             });
 
             // Repel force
-            this.createSlider(content, 'Repel force', 100, 1000, 50, 
-                this.plugin.settings.repulsionForce, async (value) => {
+            this.createSlider(content, 'Repel force', 100, 3000, 100, 
+                this.plugin.settings.repulsionForce, (value) => {
+                this.plugin.settings.repulsionForce = value;
+                if (this.view.renderer) this.view.renderer.updateForces();
+            }, async (value) => {
                 this.plugin.settings.repulsionForce = value;
                 await this.plugin.saveSettings();
-                if (this.view.renderer) this.view.renderer.updateForces();
             });
 
             // Link force
             this.createSlider(content, 'Link force', 0, 1, 0.05, 
-                this.plugin.settings.linkForce || 0.5, async (value) => {
+                this.plugin.settings.linkForce || 0.5, (value) => {
+                this.plugin.settings.linkForce = value;
+                if (this.view.renderer) this.view.renderer.updateLinkForce(value);
+            }, async (value) => {
                 this.plugin.settings.linkForce = value;
                 await this.plugin.saveSettings();
-                if (this.view.renderer) this.view.renderer.updateLinkForce(value);
             });
 
             // Link distance
-            this.createSlider(content, 'Link distance', 20, 200, 10, 
-                this.plugin.settings.linkDistance, async (value) => {
+            this.createSlider(content, 'Link distance', 20, 500, 10, 
+                this.plugin.settings.linkDistance, (value) => {
+                this.plugin.settings.linkDistance = value;
+                if (this.view.renderer) this.view.renderer.updateForces();
+            }, async (value) => {
                 this.plugin.settings.linkDistance = value;
                 await this.plugin.saveSettings();
-                if (this.view.renderer) this.view.renderer.updateForces();
             });
         });
     }
@@ -195,7 +246,7 @@ export class GraphControls {
     }
 
     private createSlider(parent: HTMLElement, label: string, min: number, max: number, step: number, 
-        value: number, onChange: (value: number) => void) {
+        value: number, onInput: (value: number) => void, onChange?: (value: number) => void) {
         const container = parent.createDiv('slider-container');
         container.createEl('span', { text: label, cls: 'slider-label' });
         
@@ -209,7 +260,13 @@ export class GraphControls {
         slider.value = value.toString();
         
         slider.addEventListener('input', () => {
-            onChange(parseFloat(slider.value));
+            onInput(parseFloat(slider.value));
         });
+
+        if (onChange) {
+            slider.addEventListener('change', () => {
+                onChange(parseFloat(slider.value));
+            });
+        }
     }
 }
