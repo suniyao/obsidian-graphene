@@ -306,7 +306,7 @@ export class GraphRenderer {
                 if (d.id === hoveredNode.id || connectedNodeIds.has(d.id)) {
                     return 1;
                 } else {
-                    return 0.2;
+                    return 0.1;
                 }
             });
 
@@ -325,7 +325,7 @@ export class GraphRenderer {
                 .transition()
                 .duration(200)
                 .style('stroke', highlight ? 'var(--interactive-accent)' : 'var(--text-muted)')
-                .attr('stroke-opacity', highlight ? 1 : 0.2)
+                .attr('stroke-opacity', highlight ? 1 : 0.1)
                 .attr('marker-end', (d: GraphLink) => showArrows2 ? (highlight ? 'url(#arrow-accent)' : 'url(#arrow)') : null);
             
             // Update dots (for similarity links)
@@ -362,10 +362,10 @@ export class GraphRenderer {
                     // Partial zoom: gradual fade with hover enhancement
                     if (d.id === hoveredNode.id) return 1;
                     if (connectedNodeIds.has(d.id)) return baseOpacity;
-                    return baseOpacity * 0.3; // Dimmed for unconnected
+                    return baseOpacity * 0.1; // Dimmed for unconnected
                 } else {
                     // Full zoom: normal behavior
-                    return (d.id === hoveredNode.id || connectedNodeIds.has(d.id)) ? 1 : 0.3;
+                    return (d.id === hoveredNode.id || connectedNodeIds.has(d.id)) ? 1 : 0.1;
                 }
             });
             
