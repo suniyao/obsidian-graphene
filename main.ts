@@ -69,13 +69,8 @@ export default class CombinedPlugin extends Plugin {
         );
 
         // Better Graph ribbon icon
-        this.addRibbonIcon('dot-network', 'Better Graph View', () => {
+        this.addRibbonIcon('dot-network', 'Graphene View', () => {
             this.activateView();
-        });
-
-        // AI Summary & Tags ribbon icon
-        this.addRibbonIcon('bot', 'Generate AI Summary & Tags', () => {
-            this.generateSummaryAndTags();
         });
 
         // Better Graph commands
@@ -92,15 +87,6 @@ export default class CombinedPlugin extends Plugin {
             name: 'Generate Embeddings for All Notes',
             callback: async () => {
                 await this.generateEmbeddingsForAllNotes();
-            }
-        });
-
-        // AI Summary & Tags command
-        this.addCommand({
-            id: 'generate-summary-tags',
-            name: 'Generate Summary and Tags',
-            callback: () => {
-                this.generateSummaryAndTags();
             }
         });
 
@@ -359,118 +345,6 @@ updateEmbeddingStatusUI(): void {
     async getEmbeddingLocally(filePath: string): Promise<number[] | null> {
         const data = await this.loadData() || {};
         return data.embeddings?.[filePath] || null;
-    }
-
-    // AI Summary & Tags Methods
-    async generateSummaryAndTags() {
-        const activeFile = this.app.workspace.getActiveFile();
-        if (!activeFile) {
-            new Notice('No active file');
-            return;
-        }
-
-        if (!this.settings.openaiApiKey) {
-            new Notice('Please set your OpenAI API key in settings');
-            return;
-        }
-
-        try {
-            const content = await this.app.vault.read(activeFile);
-            const cleanContent = this.cleanContent(content);
-
-            if (cleanContent.length < 50) {
-                new Notice('File content too short for analysis');
-                return;
-            }
-
-            new Notice('Generating summary and tags...');
-
-            const [summary, tags] = await Promise.all([
-                this.callOpenAI('Please provide a brief summary of the following text in 2-3 sentences:\n\n' + cleanContent),
-                this.callOpenAI('Generate 3-5 relevant tags for the following text. Return only the tags separated by commas:\n\n' + cleanContent)
-            ]);
-
-            await this.updateFileWithResults(activeFile, summary, tags);
-            new Notice('Summary and tags generated!');
-
-        } catch (error) {
-            console.error('Error:', error);
-            new Notice('Error: ' + error.message);
-        }
-    }
-
-    cleanContent(content: string): string {
-        // Remove existing frontmatter
-        content = content.replace(/^---\n[\s\S]*?\n---\n/, '');
-        // Remove markdown formatting
-        content = content.replace(/[#*_`]/g, '');
-        // Remove extra whitespace
-        content = content.replace(/\n{3,}/g, '\n\n').trim();
-        // Limit content length
-        return content.slice(0, 6000);
-    }
-
-    async callOpenAI(prompt: string): Promise<string> {
-        const response = await requestUrl({
-            url: 'https://api.openai.com/v1/chat/completions',
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${this.settings.openaiApiKey}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                model: 'gpt-3.5-turbo',
-                messages: [{ role: 'user', content: prompt }],
-                max_tokens: 300,
-                temperature: 0.7,
-            }),
-        });
-
-        if (response.status !== 200) {
-            throw new Error(`API error: ${response.status}`);
-        }
-
-        const data = response.json;
-        return data.choices[0].message.content.trim();
-    }
-
-    async updateFileWithResults(file: TFile, summary: string, tags: string) {
-        const content = await this.app.vault.read(file);
-        const frontmatterRegex = /^---\n([\s\S]*?)\n---\n/;
-        const match = content.match(frontmatterRegex);
-
-        let frontmatter = '';
-        let bodyContent = content;
-
-        if (match) {
-            frontmatter = match[1];
-            bodyContent = content.replace(frontmatterRegex, '');
-        }
-
-        // Parse existing frontmatter
-        const frontmatterLines = frontmatter.split('\n').filter(line => line.trim());
-        const frontmatterObj: { [key: string]: any } = {};
-
-        frontmatterLines.forEach(line => {
-            const colonIndex = line.indexOf(':');
-            if (colonIndex > -1) {
-                const key = line.substring(0, colonIndex).trim();
-                const value = line.substring(colonIndex + 1).trim();
-                frontmatterObj[key] = value;
-            }
-        });
-
-        // Add AI results
-        frontmatterObj['ai-summary'] = `"${summary.replace(/"/g, '\\"')}"`;
-        
-        const tagArray = tags.split(',').map(tag => tag.trim().replace(/^#/, ''));
-        frontmatterObj['ai-tags'] = `[${tagArray.map(tag => `"${tag}"`).join(', ')}]`;
-
-        // Build new content
-        const newFrontmatterLines = Object.entries(frontmatterObj).map(([key, value]) => `${key}: ${value}`);
-        const newContent = `---\n${newFrontmatterLines.join('\n')}\n---\n${bodyContent}`;
-
-        await this.app.vault.modify(file, newContent);
     }
 
     // Settings Methods
