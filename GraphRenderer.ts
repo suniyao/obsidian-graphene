@@ -40,6 +40,27 @@ export class GraphRenderer {
 
     isInitialized: boolean = false;
 
+    private particleAnimationTimer: any;
+
+    private startParticleAnimation() {
+        if (this.particleAnimationTimer) this.particleAnimationTimer.stop();
+        
+        this.particleAnimationTimer = d3.timer((elapsed) => {
+            if (!this.isInitialized) return;
+            
+            this.linkElements.selectAll('line.similarity-link')
+                .style('stroke-dashoffset', function(d: any) {
+                    const sim = d.similarity || 0;
+                    // Speed factor. 
+                    // Higher sim -> faster.
+                    // sim is usually 0.something.
+                    // speed pixels per ms.
+                    const speed = sim * 0.05; 
+                    return -elapsed * speed;
+                });
+        });
+    }
+
     initialize(nodes: GraphNode[], links: GraphLink[]) {
         this.nodes = nodes;
         this.links = links;
@@ -55,6 +76,9 @@ export class GraphRenderer {
         this.setupZoom();
         
         this.isInitialized = true;  // Set the flag
+        if (this.plugin.settings.showParticleAnimation !== false) {
+            this.startParticleAnimation();
+        }
     }
 
     updateData(nodes: GraphNode[], links: GraphLink[]) {
@@ -111,40 +135,46 @@ export class GraphRenderer {
             .attr('d', 'M0,-3L10,0L0,3Q1.5,0 0,-3Z');  // Acute arrow with concave curved base
     }
 
-private setupLinks() {
-    this.g.selectAll('.links').remove();
-    
-    const linksGroup = this.g.append('g')
-        .attr('class', 'links');
-    
-    // Create groups for each link
-    this.linkElements = linksGroup.selectAll<SVGGElement, GraphLink>('g.link-group')
-        .data(this.links)
-        .join('g')
-        .attr('class', d => `link-group ${d.type || 'normal'}`);
-    
-    // Add either solid lines or prepare for dotted lines
-    const showArrows = this.showArrows;
-    const defaultThickness = this.plugin.settings.defaultLinkThickness;
-    this.linkElements.each(function(d) {
-        const group = d3.select(this);
+    private setupLinks() {
+        this.g.selectAll('.links').remove();
         
-        if (d.similarity !== undefined && d.similarity > 0 && !d.type) {
-            // For similarity links (not manual links), we'll add dots in the ticked function
-            group.attr('data-similarity', d.similarity);
-        } else {
-            // Regular solid line for manual links and tag links
-            group.append('line')
-                .attr('class', 'link solid-link')
-                .style('stroke', 'var(--text-muted)')
-                .attr('stroke-opacity', 0.6)
-                .attr('stroke-width', defaultThickness)
-                .attr('marker-end', showArrows ? 'url(#arrow)' : null);
-        }
-    });
-}
-
-private setupNodes() {
+        const linksGroup = this.g.append('g')
+            .attr('class', 'links');
+        
+        // Create groups for each link
+        this.linkElements = linksGroup.selectAll<SVGGElement, GraphLink>('g.link-group')
+            .data(this.links)
+            .join('g')
+            .attr('class', d => `link-group ${d.type || 'normal'}`);
+        
+        // Add either solid lines or prepare for dotted lines
+        const showArrows = this.showArrows;
+        const defaultThickness = this.plugin.settings.defaultLinkThickness;
+        this.linkElements.each(function(d) {
+            const group = d3.select(this);
+            
+            if (d.similarity !== undefined && d.similarity > 0 && !d.type) {
+                // For similarity links (not manual links), we'll add dots in the ticked function
+                group.attr('data-similarity', d.similarity);
+                
+                // Use a dashed line for similarity links to enable animation
+                group.append('line')
+                    .attr('class', 'link similarity-link')
+                    .style('stroke', 'var(--text-muted)')
+                    .style('stroke-opacity', 0.6)
+                    .attr('stroke-width', defaultThickness)
+                    .attr('stroke-linecap', 'round'); // Round caps for dots
+            } else {
+                // Regular solid line for manual links and tag links
+                group.append('line')
+                    .attr('class', 'link solid-link')
+                    .style('stroke', 'var(--text-muted)')
+                    .attr('stroke-opacity', 0.6)
+                    .attr('stroke-width', defaultThickness)
+                    .attr('marker-end', showArrows ? 'url(#arrow)' : null);
+            }
+        });
+    }private setupNodes() {
     this.g.selectAll('.nodes').remove();
     
     this.nodeElements = this.g.append('g')
@@ -173,20 +203,53 @@ private setupNodes() {
             }
             return 'var(--text-muted)';
         })
-    .attr('stroke', 'none')
-    .attr('stroke-width', 0)
-        .attr('opacity', 1);
+        .attr('stroke', 'none')
+        .attr('stroke-width', 0)
+        .attr('opacity', 1)
+        .style('pointer-events', 'all') // Ensure only circles are interactive
+        .style('cursor', 'pointer');
 
-        // Add labels
-        this.nodeElements.append('text')
-            .text(d => d.name)
-            .attr('x', 0)
-            .attr('y', d => (d.type === 'tag' ? this.plugin.settings.nodeSize * 0.8 : this.plugin.settings.nodeSize) + 15)
-            .attr('text-anchor', 'middle')
-            .attr('class', 'node-label')
-            .style('fill', 'var(--text-normal)')
-            .style('font-size', d => d.type === 'tag' ? '11px' : '12px')
-            .style('font-weight', d => d.type === 'tag' ? '600' : 'normal');
+        // Add labels with text wrapping
+        const maxLabelWidth = 240; // Max width in pixels
+        
+        this.nodeElements.each(function(d) {
+            const group = d3.select(this);
+            const nodeRadius = d.type === 'tag' ? 
+                (d.connectionCount ? 
+                    Math.min(2 * 16, 0.8 * 16 + Math.log(d.connectionCount + 1) / Math.log(10) * 10) : 
+                    0.8 * 16) : 
+                16; // Approximate node radius
+            const yOffset = nodeRadius-10;
+            
+            // Calculate font sizes for consistent text wrapping
+            const baseFontSize = d.type === 'tag' ? 11 : 12;
+            const hoverFontSize = baseFontSize * 1.2;
+            
+            // Create a foreignObject for HTML text wrapping
+            const fo = group.append('foreignObject')
+                .attr('x', -maxLabelWidth / 2)
+                .attr('y', yOffset)
+                .attr('width', maxLabelWidth)
+                .attr('height', 60) // Enough height for 3-4 lines
+                .attr('class', 'node-label-container')
+                .style('pointer-events', 'none'); // Make entire foreignObject non-interactive
+            
+            const div = fo.append('xhtml:div')
+                .style('width', '100%')
+                .style('text-align', 'center')
+                .style('word-wrap', 'break-word')
+                .style('overflow-wrap', 'break-word')
+                .style('hyphens', 'auto')
+                .style('font-size', hoverFontSize + 'px') // Use hover size for layout calculation
+                .style('font-weight', d.type === 'tag' ? '600' : 'normal')
+                .style('color', 'var(--text-normal)')
+                .style('line-height', '1.2')
+                .style('font-family', 'var(--font-interface)')
+                .style('pointer-events', 'none') // Make text labels non-interactive
+                .style('transform', `scale(${baseFontSize / hoverFontSize})`) // Scale down to normal size
+                .style('transform-origin', 'center top')
+                .text(d.name);
+        });
 
         this.nodeElements.on('click', async (event, d) => {
             event.stopPropagation();
@@ -266,26 +329,55 @@ private setupNodes() {
                 .attr('marker-end', (d: GraphLink) => showArrows2 ? (highlight ? 'url(#arrow-accent)' : 'url(#arrow)') : null);
             
             // Update dots (for similarity links)
-            group.selectAll('circle.link-dot')
+            group.selectAll('line.similarity-link')
                 .transition()
                 .duration(200)
-                .style('fill', highlight ? 'var(--interactive-accent)' : 'var(--text-muted)')
-                .style('opacity', highlight ? 1 : 0.2);
+                .style('stroke', highlight ? 'var(--interactive-accent)' : 'var(--text-muted)')
+                .style('stroke-opacity', highlight ? 1 : 0.1);
         });
 
         // Update text styling (opacity + size + vertical offset)
-        this.nodeElements.selectAll('text')
+        // Check current zoom level for smooth fade behavior
+        const svgNode = this.svg.node();
+        const currentZoom = svgNode ? d3.zoomTransform(svgNode).k : 1;
+        const fadeThreshold = this.plugin.settings.textFadeThreshold || 0.7;
+        const fadeStart = fadeThreshold * 0.43; // Start at 43% of threshold value
+        
+        // Calculate base opacity from zoom level
+        let baseOpacity = 0;
+        if (currentZoom >= fadeThreshold) {
+            baseOpacity = 1;
+        } else if (currentZoom > fadeStart) {
+            baseOpacity = (currentZoom - fadeStart) / (fadeThreshold - fadeStart);
+        }
+        
+        this.nodeElements.selectAll('foreignObject')
             .transition()
             .duration(200)
-            .style('opacity', (d: GraphNode) => (d.id === hoveredNode.id || connectedNodeIds.has(d.id)) ? 1 : 0.3)
-            .style('font-size', (d: GraphNode) => {
+            .style('opacity', (d: GraphNode) => {
+                if (currentZoom < fadeStart) {
+                    // Very zoomed out: only show hovered node
+                    return d.id === hoveredNode.id ? 1 : 0;
+                } else if (currentZoom < fadeThreshold) {
+                    // Partial zoom: gradual fade with hover enhancement
+                    if (d.id === hoveredNode.id) return 1;
+                    if (connectedNodeIds.has(d.id)) return baseOpacity;
+                    return baseOpacity * 0.3; // Dimmed for unconnected
+                } else {
+                    // Full zoom: normal behavior
+                    return (d.id === hoveredNode.id || connectedNodeIds.has(d.id)) ? 1 : 0.3;
+                }
+            });
+            
+        this.nodeElements.selectAll('foreignObject div')
+            .transition()
+            .duration(200)
+            .style('transform', (d: GraphNode) => {
                 const base = d.type === 'tag' ? 11 : 12;
-                const size = (d.id === hoveredNode.id) ? base * 1.2 : base;
-                return size + 'px';
-            })
-            .attr('y', (d: GraphNode) => {
-                const baseY = (d.type === 'tag' ? this.plugin.settings.nodeSize * 0.8 : this.plugin.settings.nodeSize) + 15;
-                return (d.id === hoveredNode.id) ? baseY + 12 : baseY;
+                const hover = base * 1.2;
+                const isHovered = d.id === hoveredNode.id;
+                const scale = isHovered ? 1.0 : (base / hover); // Scale to 1.0 when hovered, normal scale otherwise
+                return `scale(${scale})`;
             });
     })
     .on('mouseleave', () => {
@@ -308,19 +400,40 @@ private setupNodes() {
                 .style('stroke', 'var(--text-muted)')
                 .attr('stroke-opacity', 0.6);
             
-            group.selectAll('circle.link-dot')
+            group.selectAll('line.similarity-link')
                 .transition()
                 .duration(200)
-                .style('fill', 'var(--text-muted)')
-                .style('opacity', 0.6);
+                .style('stroke', 'var(--text-muted)')
+                .style('stroke-opacity', 0.6);
         });
 
-        this.nodeElements.selectAll('text')
+        this.nodeElements.selectAll('foreignObject')
             .transition()
             .duration(200)
-            .style('opacity', 1)
-            .style('font-size', (d: GraphNode) => d.type === 'tag' ? '11px' : '12px')
-            .attr('y', (d: GraphNode) => (d.type === 'tag' ? this.plugin.settings.nodeSize * 0.8 : this.plugin.settings.nodeSize) + 15);
+            .style('opacity', () => {
+                // Check current zoom level for smooth fade when resetting
+                const svgNode = this.svg.node();
+                const currentZoom = svgNode ? d3.zoomTransform(svgNode).k : 1;
+                const fadeThreshold = this.plugin.settings.textFadeThreshold || 0.7;
+                const fadeStart = fadeThreshold * 0.43; // Start at 43% of threshold value
+                
+                if (currentZoom >= fadeThreshold) {
+                    return 1;
+                } else if (currentZoom > fadeStart) {
+                    return (currentZoom - fadeStart) / (fadeThreshold - fadeStart);
+                } else {
+                    return 0;
+                }
+            });
+            
+        this.nodeElements.selectAll('foreignObject div')
+            .transition()
+            .duration(200)
+            .style('transform', (d: GraphNode) => {
+                const base = d.type === 'tag' ? 11 : 12;
+                const hover = base * 1.2;
+                return `scale(${base / hover})`; // Reset to normal scale
+            });
     });
 }
 
@@ -331,11 +444,24 @@ private setupNodes() {
             .on('zoom', (event) => {
                 this.g.attr('transform', event.transform);
                 
-                // Handle text fading based on zoom level
+                // Handle text fading based on zoom level with smooth transition
                 const zoomLevel = event.transform.k;
-                const fadeThreshold = 0.7; // You can make this configurable
-                this.nodeElements?.selectAll('text')
-                    .style('opacity', zoomLevel < fadeThreshold ? 0 : 1);
+                const fadeThreshold = this.plugin.settings.textFadeThreshold || 0.7;
+                const fadeStart = fadeThreshold * 0.43; // Start fading in at 43% of threshold value
+                
+                // Calculate opacity based on zoom level
+                let baseOpacity = 0;
+                if (zoomLevel >= fadeThreshold) {
+                    baseOpacity = 1; // Full opacity above threshold
+                } else if (zoomLevel > fadeStart) {
+                    // Gradual fade between fadeStart and fadeThreshold
+                    baseOpacity = (zoomLevel - fadeStart) / (fadeThreshold - fadeStart);
+                } else {
+                    baseOpacity = 0; // Hidden below fadeStart
+                }
+                
+                this.nodeElements?.selectAll('foreignObject')
+                    .style('opacity', baseOpacity);
             });
 
         this.svg.call(this.zoom);
@@ -384,91 +510,90 @@ private setupNodes() {
     
     }
 
-private setupSimulation() {
-    const width = this.container.clientWidth || 800;
-    const height = this.container.clientHeight || 600;
-    const centerX = width / 2;
-    const centerY = height / 2;
-
-    this.simulation = d3.forceSimulation<GraphNode>(this.nodes)
-        .force('link', d3.forceLink<GraphNode, GraphLink>(this.links)
-            .id(d => d.id)
-            .distance(d => {
-                if (d.similarity !== undefined) {
-                    // Tighter distance range: at similarity=1 (identical), distance=0.5x base
-                    // at similarity=0, distance=1.2x base (reduced max from 2x)
-                    return this.plugin.settings.linkDistance * (1.2 - 0.7 * d.similarity);
-                }
-                return this.plugin.settings.linkDistance;
-            })
-            .strength(0.5))
-        .force('charge', d3.forceManyBody()
-            .strength((d: GraphNode) => {
-                // Stronger repulsion for tag nodes based on their size
-                if (d.type === 'tag' && d.connectionCount) {
-                    return -this.plugin.settings.repulsionForce * (1 + Math.log(d.connectionCount + 1) / 3);
-                }
-                return -this.plugin.settings.repulsionForce;
-            }))
-        .force('center', d3.forceCenter(centerX, centerY)
-            .strength(this.plugin.settings.centerForce))
-        // Use forceX and forceY instead of radial to spread nodes better
-        .force('x', d3.forceX(centerX).strength(0.05))
-        .force('y', d3.forceY(centerY).strength(0.05))
-        .force('collision', d3.forceCollide()
-            .radius((d: GraphNode) => {
-                if (d.type === 'tag' && d.connectionCount) {
-                    const minSize = this.plugin.settings.nodeSize * 0.8;
-                    const maxSize = this.plugin.settings.nodeSize * 2;
-                    const scaleFactor = Math.log(d.connectionCount + 1) / Math.log(10);
-                    return Math.min(maxSize, minSize + scaleFactor * 10) + 5;
-                }
-                return this.plugin.settings.nodeSize + 5;
-            })
-            .strength(0.7))
-        .on('tick', () => this.ticked());
-
-    // Apply initial positions in a grid to ensure good distribution
-    const cols = Math.ceil(Math.sqrt(this.nodes.length));
-    const cellWidth = width / cols;
-    const cellHeight = height / cols;
-    
-    this.nodes.forEach((node, i) => {
-        const col = i % cols;
-        const row = Math.floor(i / cols);
-        node.x = cellWidth * (col + 0.5) + (Math.random() - 0.5) * 20;
-        node.y = cellHeight * (row + 0.5) + (Math.random() - 0.5) * 20;
-    });
-
-    this.simulation.alpha(1).restart();
-}
-
-    updateForces() {
+    private setupSimulation() {
         const width = this.container.clientWidth || 800;
         const height = this.container.clientHeight || 600;
         const centerX = width / 2;
         const centerY = height / 2;
-        const radius = Math.min(width, height) * 0.4;
+
+        // Calculate radius for circular distribution based on center force
+        // High center force = tight circle, Low center force = loose circle
+        const baseRadius = Math.min(width, height) * 0.3;
+        const radiusMultiplier = 1.0 + (1.0 - this.plugin.settings.centerForce) * 2.0; // Range: 1.0x to 3.0x
+        const targetRadius = baseRadius * radiusMultiplier;
+
+        this.simulation = d3.forceSimulation<GraphNode>(this.nodes)
+            .force('link', d3.forceLink<GraphNode, GraphLink>(this.links)
+                .id(d => d.id)
+                .distance(d => {
+                    if (d.similarity !== undefined) {
+                        // Steeper curve for similarity to create high difference in distance
+                        return this.plugin.settings.linkDistance * (3.0 - 2.8 * d.similarity);
+                    }
+                    return this.plugin.settings.linkDistance * 1.2;
+                })
+                .strength(0.1)) // Much weaker link force to allow natural scattering
+            .force('charge', d3.forceManyBody()
+                .strength(-this.plugin.settings.repulsionForce * 0.8)
+                .distanceMax(targetRadius * 1.5)) // Scale repulsion distance with target radius
+            .force('radial', d3.forceRadial(targetRadius, centerX, centerY)
+                .strength(0.05)) // Gentle radial force to create circular boundary
+            .force('collision', d3.forceCollide()
+                .radius((d: GraphNode) => {
+                    if (d.type === 'tag' && d.connectionCount) {
+                        const minSize = this.plugin.settings.nodeSize * 0.8;
+                        const maxSize = this.plugin.settings.nodeSize * 2;
+                        const scaleFactor = Math.log(d.connectionCount + 1) / Math.log(10);
+                        return Math.min(maxSize, minSize + scaleFactor * 10) + 4;
+                    }
+                    return this.plugin.settings.nodeSize + 4;
+                })
+                .strength(0.7)
+                .iterations(2))
+            .on('tick', () => this.ticked());
+
+        // Apply initial positions scattered naturally within the target circle
+        this.nodes.forEach((node) => {
+            // Random angle and distance for natural distribution
+            const angle = Math.random() * 2 * Math.PI;
+            const distance = Math.sqrt(Math.random()) * targetRadius * 0.8; // sqrt for uniform distribution
+            node.x = centerX + Math.cos(angle) * distance;
+            node.y = centerY + Math.sin(angle) * distance;
+        });
+
+        this.simulation.alpha(1).restart();
+    }    updateForces() {
+        const width = this.container.clientWidth || 800;
+        const height = this.container.clientHeight || 600;
+        const centerX = width / 2;
+        const centerY = height / 2;
+        
+        // Calculate new target radius based on center force setting
+        const baseRadius = Math.min(width, height) * 0.3;
+        const radiusMultiplier = 1.0 + (1.0 - this.plugin.settings.centerForce) * 2.0;
+        const targetRadius = baseRadius * radiusMultiplier;
             
         if (this.simulation) {
+            // Update charge force
             (this.simulation.force('charge') as d3.ForceManyBody<GraphNode>)
-                ?.strength(-this.plugin.settings.repulsionForce);
+                ?.strength(-this.plugin.settings.repulsionForce * 0.8)
+                ?.distanceMax(targetRadius * 1.5);
             
-            (this.simulation.force('center') as d3.ForceCenter<GraphNode>)
-                ?.strength(this.plugin.settings.centerForce);
-            
+            // Update link distances
             (this.simulation.force('link') as d3.ForceLink<GraphNode, GraphLink>)
                 ?.distance(d => {
                     if (d.similarity !== undefined) {
-                        // Tighter distance range: at similarity=1, distance=0.5x base; at similarity=0, distance=1.2x base
-                        return this.plugin.settings.linkDistance * (1.2 - 0.7 * d.similarity);
+                        return this.plugin.settings.linkDistance * (3.0 - 2.8 * d.similarity);
                     }
-                    return this.plugin.settings.linkDistance;
+                    return this.plugin.settings.linkDistance * 1.2;
                 });
             
-            // Update radial force
+            // Update radial force with new radius - this controls tight vs loose circle
             (this.simulation.force('radial') as d3.ForceRadial<GraphNode>)
-                ?.radius(radius);
+                ?.radius(targetRadius)
+                ?.x(centerX)
+                ?.y(centerY)
+                ?.strength(0.05);
 
             this.simulation.alpha(0.3).restart();
         }
@@ -563,79 +688,70 @@ private setupSimulation() {
         this.nodeElements = node;
     }
 
-private ticked() {
-    // Update link positions
-    const similarityThreshold = this.plugin.settings.similarityThreshold;
-    const getNodeRadius = (n: GraphNode) => this.getNodeRadius(n);
-    const showArrows = this.showArrows;
-    this.linkElements.each((d: any, index, groups) => {
-        const group = d3.select(groups[index]);
-        const source = d.source as GraphNode;
-        const target = d.target as GraphNode;
-        const sourceId = source.id;
-        const targetId = target.id;
-        const edgePair = `${sourceId}|${targetId}`;
-        const highlight = this.highlightedEdges.has(edgePair);
-        
-        // Update solid lines
-        const dx = target.x! - source.x!;
-        const dy = target.y! - source.y!;
-        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const rSource = getNodeRadius(source);
-        const rTarget = getNodeRadius(target);
-        const arrowPad = showArrows ? 6 : 0; // back off a bit more for arrowhead visibility
-        const totalBackoff = Math.min(dist / 2, rSource);
-        const totalForeoff = Math.min(dist / 2, rTarget); // + arrowpad? 
-        const ux = dx / dist;
-        const uy = dy / dist;
-        const x1 = source.x! + ux * totalBackoff;
-        const y1 = source.y! + uy * totalBackoff;
-        const x2 = target.x! - ux * totalForeoff;
-        const y2 = target.y! - uy * totalForeoff;
-
-        group.select('line.solid-link')
-            .attr('x1', x1)
-            .attr('y1', y1)
-            .attr('x2', x2)
-            .attr('y2', y2);
-        
-        // Handle dotted lines for similarity links
-        const similarity = group.attr('data-similarity');
-        if (similarity) {
-            const sim = parseFloat(similarity);
+    private ticked() {
+        // Update link positions
+        const similarityThreshold = this.plugin.settings.similarityThreshold;
+        const getNodeRadius = (n: GraphNode) => this.getNodeRadius(n);
+        const showArrows = this.showArrows;
+        this.linkElements.each((d: any, index, groups) => {
+            const group = d3.select(groups[index]);
+            const source = d.source as GraphNode;
+            const target = d.target as GraphNode;
+            const sourceId = source.id;
+            const targetId = target.id;
+            const edgePair = `${sourceId}|${targetId}`;
+            const highlight = this.highlightedEdges.has(edgePair);
+            
+            // Update solid lines
             const dx = target.x! - source.x!;
             const dy = target.y! - source.y!;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            const dotRadiusSetting = this.plugin.settings.dottedLinkThickness ?? Math.max(1, this.plugin.settings.defaultLinkThickness / 2);
-            const dotRadius = Math.max(0.5, dotRadiusSetting);
-            // Spacing inversely proportional to similarity above threshold: higher similarity = tighter spacing
-            const spacing = Math.min(1 / (sim - similarityThreshold), 30); // make it a bit loosen
-            
-            // Remove old dots
-            group.selectAll('circle').remove();
-            
-            // Create new dots
-            const numDots = Math.floor(distance / spacing);
-            if (numDots > 1) {
-                for (let i = 1; i < numDots; i++) {
-                    const t = i / numDots;
-                    group.append('circle')
-                        .attr('class', 'link-dot')
-                        .attr('cx', source.x! + dx * t)
-                        .attr('cy', source.y! + dy * t)
-                        .attr('r', dotRadius)
-                        .attr('fill', highlight ? 'var(--interactive-accent)' : 'var(--text-muted)')
-                        .style('opacity', highlight ? 1 : 0.6);
-                }
-            }
-        }
-    });
-    
-    // Update node positions
-    this.nodeElements.attr('transform', d => `translate(${d.x},${d.y})`);
-}
+            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+            const rSource = getNodeRadius(source);
+            const rTarget = getNodeRadius(target);
+            const arrowPad = showArrows ? 6 : 0; // back off a bit more for arrowhead visibility
+            const totalBackoff = Math.min(dist / 2, rSource);
+            const totalForeoff = Math.min(dist / 2, rTarget); // + arrowpad? 
+            const ux = dx / dist;
+            const uy = dy / dist;
+            const x1 = source.x! + ux * totalBackoff;
+            const y1 = source.y! + uy * totalBackoff;
+            const x2 = target.x! - ux * totalForeoff;
+            const y2 = target.y! - uy * totalForeoff;
 
-    // Add these methods to GraphRenderer class:
+            group.select('line.solid-link')
+                .attr('x1', x1)
+                .attr('y1', y1)
+                .attr('x2', x2)
+                .attr('y2', y2);
+            
+            // Handle dotted lines for similarity links
+            const similarity = group.attr('data-similarity');
+            if (similarity) {
+                const sim = parseFloat(similarity);
+                const dotRadiusSetting = this.plugin.settings.dottedLinkThickness ?? Math.max(1, this.plugin.settings.defaultLinkThickness / 2);
+                
+                // Normalize similarity to 0-1 range based on threshold
+                const normalizedSim = Math.max(0, (sim - similarityThreshold) / (1 - similarityThreshold));
+                
+                // Spacing inversely proportional to similarity: higher similarity = tighter spacing
+                // Range: 80px (low sim) to 3px (high sim) for more obvious difference
+                const minSpacing = 3;
+                const maxSpacing = 80;
+                const spacing = maxSpacing - normalizedSim * (maxSpacing - minSpacing);
+                
+                group.select('line.similarity-link')
+                    .attr('x1', x1)
+                    .attr('y1', y1)
+                    .attr('x2', x2)
+                    .attr('y2', y2)
+                    .attr('stroke-width', dotRadiusSetting * 2)
+                    .style('stroke-dasharray', `0 ${spacing}`);
+            }
+        });
+        
+        // Update node positions
+        this.nodeElements.attr('transform', d => `translate(${d.x},${d.y})`);
+    }    // Add these methods to GraphRenderer class:
 
     applyNodeVisibility() {
         // Update node visibility
@@ -661,54 +777,63 @@ private ticked() {
     }
 
     setTextFadeThreshold(threshold: number) {
-        // Implement text fading based on zoom level
+        // Implement smooth text fading based on zoom level
         const svgNode = this.svg.node();
         if (!svgNode) return;
         const currentZoom = d3.zoomTransform(svgNode).k;
-        this.nodeElements.selectAll('text')
-            .style('opacity', currentZoom < threshold ? 0 : 1);
+        const fadeStart = threshold * 0.43; // Start at 43% of threshold value
+        
+        let opacity = 0;
+        if (currentZoom >= threshold) {
+            opacity = 1;
+        } else if (currentZoom > fadeStart) {
+            opacity = (currentZoom - fadeStart) / (threshold - fadeStart);
+        }
+        
+        this.nodeElements.selectAll('foreignObject')
+            .style('opacity', opacity);
     }
 
     // Add or update this method in the GraphRenderer class:
 
 updateNodeSize(size: number) {
-    // Only update file nodes, not tag nodes
-    this.nodeElements?.selectAll('circle')
-        .attr('r', (d: GraphNode) => {
-            if (d.type === 'tag' && d.connectionCount) {
-                // Keep tag size based on connections, don't change it
-                const minSize = this.plugin.settings.nodeSize * 0.8;
-                const maxSize = this.plugin.settings.nodeSize * 2;
-                const scaleFactor = Math.log(d.connectionCount + 1) / Math.log(10);
-                return Math.min(maxSize, minSize + scaleFactor * 10);
-            } else if (d.type === 'tag') {
-                // Default tag size (unchanged)
-                return this.plugin.settings.nodeSize * 0.8;
-            } else {
-                // File nodes - apply the new size
-                return size;
-            }
-        });
-    
-    // Update collision force to account for new sizes
-    if (this.simulation) {
-        (this.simulation.force('collision') as d3.ForceCollide<GraphNode>)
-            ?.radius(d => {
+        // Only update file nodes, not tag nodes
+        this.nodeElements?.selectAll('circle')
+            .attr('r', (d: GraphNode) => {
                 if (d.type === 'tag' && d.connectionCount) {
+                    // Keep tag size based on connections, don't change it
                     const minSize = this.plugin.settings.nodeSize * 0.8;
                     const maxSize = this.plugin.settings.nodeSize * 2;
                     const scaleFactor = Math.log(d.connectionCount + 1) / Math.log(10);
-                    return Math.min(maxSize, minSize + scaleFactor * 10) + 5;
+                    return Math.min(maxSize, minSize + scaleFactor * 10);
                 } else if (d.type === 'tag') {
-                    return this.plugin.settings.nodeSize * 0.8 + 5;
+                    // Default tag size (unchanged)
+                    return this.plugin.settings.nodeSize * 0.8;
                 } else {
-                    return size + 5;
+                    // File nodes - apply the new size
+                    return size;
                 }
             });
         
-        this.simulation.alpha(0.3).restart();
+        // Update collision force to account for new sizes
+        if (this.simulation) {
+            (this.simulation.force('collision') as d3.ForceCollide<GraphNode>)
+                ?.radius(d => {
+                    if (d.type === 'tag' && d.connectionCount) {
+                        const minSize = this.plugin.settings.nodeSize * 0.8;
+                        const maxSize = this.plugin.settings.nodeSize * 2;
+                        const scaleFactor = Math.log(d.connectionCount + 1) / Math.log(10);
+                        return Math.min(maxSize, minSize + scaleFactor * 10) + 8;
+                    } else if (d.type === 'tag') {
+                        return this.plugin.settings.nodeSize * 0.8 + 8;
+                    } else {
+                        return size + 8;
+                    }
+                });
+            
+            this.simulation.alpha(0.3).restart();
+        }
     }
-}
     updateLinkThickness(thickness: number) {
         // Apply thickness to solid lines inside each link group.
         this.linkElements.each(function(rawLink: GraphLink) {
@@ -721,13 +846,13 @@ updateNodeSize(size: number) {
 
         // Keep dotted similarity edges visually in sync by scaling their dot radius relative to solid edges when needed.
         const fallbackDotSize = this.plugin.settings.dottedLinkThickness ?? Math.max(0.5, thickness / 2);
-        this.linkElements.selectAll('circle.link-dot')
-            .attr('r', fallbackDotSize);
+        this.linkElements.selectAll('line.similarity-link')
+            .attr('stroke-width', fallbackDotSize * 2);
     }
 
     updateDottedLinkSize(size: number) {
-        this.linkElements.selectAll('circle.link-dot')
-            .attr('r', size);
+        this.linkElements.selectAll('line.similarity-link')
+            .attr('stroke-width', size * 2);
     }
 
     updateLinkForce(strength: number) {
@@ -756,7 +881,22 @@ updateNodeSize(size: number) {
         }
         
         if (this.simulation) {
-            this.simulation.force('center', d3.forceCenter(width / 2, height / 2));
+            const centerX = width / 2;
+            const centerY = height / 2;
+            const baseRadius = Math.min(width, height) * 0.3;
+            const radiusMultiplier = 1.0 + (1.0 - this.plugin.settings.centerForce) * 2.0;
+            const targetRadius = baseRadius * radiusMultiplier;
+            
+            // Update radial force with new dimensions
+            (this.simulation.force('radial') as d3.ForceRadial<GraphNode>)
+                ?.radius(targetRadius)
+                ?.x(centerX)
+                ?.y(centerY);
+                
+            // Update charge distance max
+            (this.simulation.force('charge') as d3.ForceManyBody<GraphNode>)
+                ?.distanceMax(targetRadius * 1.5);
+                
             this.simulation.alpha(0.3).restart();
         }
     }
@@ -765,8 +905,25 @@ updateNodeSize(size: number) {
         if (this.simulation) {
             this.simulation.stop();
         }
+        if (this.particleAnimationTimer) {
+            this.particleAnimationTimer.stop();
+        }
         if (this.svg) {
             this.svg.remove();
+        }
+    }
+
+    toggleParticleAnimation(enabled: boolean) {
+        if (enabled) {
+            this.startParticleAnimation();
+        } else {
+            if (this.particleAnimationTimer) {
+                this.particleAnimationTimer.stop();
+                this.particleAnimationTimer = null;
+            }
+            // Reset dash offset to 0 so lines look static
+            this.linkElements.selectAll('line.similarity-link')
+                .style('stroke-dashoffset', 0);
         }
     }
 }

@@ -3,9 +3,9 @@ import { BetterGraphSettings, FileEmbeddingStatus, EmbeddingCache } from './type
 
 export class EmbeddingService {
     private openaiApiKey: string;
-    private pineconeApiKey: string;
-    private pineconeEnvironment: string;
-    private pineconeIndexName: string;
+    // private pineconeApiKey: string;
+    // private pineconeEnvironment: string;
+    // private pineconeIndexName: string;
     private useLocalEmbeddings: boolean;
     private localEmbeddingEndpoint: string;
     private embeddingCache: EmbeddingCache;
@@ -13,9 +13,9 @@ export class EmbeddingService {
 
     constructor(settings: BetterGraphSettings, app: any) {
         this.openaiApiKey = settings.openaiApiKey;
-        this.pineconeApiKey = settings.pineconeApiKey;
-        this.pineconeEnvironment = settings.pineconeEnvironment;
-        this.pineconeIndexName = settings.pineconeIndexName;
+        // this.pineconeApiKey = settings.pineconeApiKey;
+        // this.pineconeEnvironment = settings.pineconeEnvironment;
+        // this.pineconeIndexName = settings.pineconeIndexName;
         this.useLocalEmbeddings = !!settings.useLocalEmbeddings;
         this.localEmbeddingEndpoint = settings.localEmbeddingEndpoint || 'http://127.0.0.1:8000/embed';
         this.app = app;
@@ -36,9 +36,9 @@ export class EmbeddingService {
 
     updateSettings(settings: BetterGraphSettings) {
         this.openaiApiKey = settings.openaiApiKey;
-        this.pineconeApiKey = settings.pineconeApiKey;
-        this.pineconeEnvironment = settings.pineconeEnvironment;
-        this.pineconeIndexName = settings.pineconeIndexName;
+        // this.pineconeApiKey = settings.pineconeApiKey;
+        // this.pineconeEnvironment = settings.pineconeEnvironment;
+        // this.pineconeIndexName = settings.pineconeIndexName;
         this.useLocalEmbeddings = !!settings.useLocalEmbeddings;
         this.localEmbeddingEndpoint = settings.localEmbeddingEndpoint || this.localEmbeddingEndpoint;
     }
@@ -287,34 +287,34 @@ export class EmbeddingService {
     }
 
     async storeEmbedding(id: string, embedding: number[], metadata: any = {}): Promise<void> {
-        if (!this.pineconeApiKey || !this.pineconeEnvironment || !this.pineconeIndexName) {
-            // Skip Pinecone storage if not configured
-            return;
-        }
+        // if (!this.pineconeApiKey || !this.pineconeEnvironment || !this.pineconeIndexName) {
+        //     // Skip Pinecone storage if not configured
+        //     return;
+        // }
 
-        try {
-            const response = await fetch(`https://${this.pineconeIndexName}-${this.pineconeEnvironment}.svc.pinecone.io/vectors/upsert`, {
-                method: 'POST',
-                headers: {
-                    'Api-Key': this.pineconeApiKey,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    vectors: [{
-                        id: id,
-                        values: embedding,
-                        metadata: metadata
-                    }]
-                })
-            });
+        // try {
+        //     const response = await fetch(`https://${this.pineconeIndexName}-${this.pineconeEnvironment}.svc.pinecone.io/vectors/upsert`, {
+        //         method: 'POST',
+        //         headers: {
+        //             'Api-Key': this.pineconeApiKey,
+        //             'Content-Type': 'application/json',
+        //         },
+        //         body: JSON.stringify({
+        //             vectors: [{
+        //                 id: id,
+        //                 values: embedding,
+        //                 metadata: metadata
+        //             }]
+        //         })
+        //     });
 
-            if (!response.ok) {
-                throw new Error(`Pinecone API error: ${response.statusText}`);
-            }
-        } catch (error) {
-            console.error('Error storing embedding in Pinecone:', error);
-            // Don't throw error here to allow local operation
-        }
+        //     if (!response.ok) {
+        //         throw new Error(`Pinecone API error: ${response.statusText}`);
+        //     }
+        // } catch (error) {
+        //     console.error('Error storing embedding in Pinecone:', error);
+        //     // Don't throw error here to allow local operation
+        // }
     }
 
     calculateCosineSimilarity(vec1: number[], vec2: number[]): number {

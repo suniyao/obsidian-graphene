@@ -32,68 +32,78 @@ export class BetterGraphView extends ItemView {
     }
 
     getDisplayText() {
-        return "Better Graph View";
+        return "Graphene";
     }
 
     getIcon() {
         return "dot-network";
     }
 
-// In the onOpen() method, update the control panel creation:
-// In the onOpen() method:
+    async onOpen() {
+        const container = this.containerEl.children[1];
+        container.empty();
+        container.addClass('better-graph-view');
+        
+        // Initialize filters from settings
+        this.filters.showTags = this.plugin.settings.showTags;
+        this.filters.showAttachments = this.plugin.settings.showAttachments;
+        this.filters.existingFilesOnly = this.plugin.settings.existingFilesOnly;
+        this.filters.showOrphans = this.plugin.settings.showOrphans;
+        
+        // Create main container
+        const mainContainer = container.createDiv('graph-main-container');
+        
+        // Create graph container
+        const graphContainer = mainContainer.createDiv('graph-container');
+        
+        // Create control panel container
+        const controlPanelContainer = mainContainer.createDiv('graph-control-panel');
+        controlPanelContainer.style.display = 'none';
+        
+        // Create control toggle button
+        const controlToggle = mainContainer.createDiv('graph-control-toggle');
+        setIcon(controlToggle, 'settings');
+        
+        // Toggle control panel
+        controlToggle.addEventListener('click', () => {
+            const isOpen = controlPanelContainer.style.display === 'flex';
+            controlPanelContainer.style.display = isOpen ? 'none' : 'flex';
+            controlToggle.style.display = isOpen ? 'flex' : 'none';
+        });
+        
+        // Create close button inside panel
+        const controlHeader = controlPanelContainer.createDiv('graph-control-header');
+        const filterTitle = controlHeader.createDiv('graph-control-title');
+        // setIcon(filterTitle, 'chevron-down');
+        filterTitle.createSpan({ text: 'Settings' });
+        
+        const actionsContainer = controlHeader.createDiv('graph-control-actions');
+        actionsContainer.style.display = 'flex';
+        actionsContainer.style.gap = '4px';
 
-async onOpen() {
-    const container = this.containerEl.children[1];
-    container.empty();
-    container.addClass('better-graph-view');
-    
-    // Create main container
-    const mainContainer = container.createDiv('graph-main-container');
-    
-    // Create graph container
-    const graphContainer = mainContainer.createDiv('graph-container');
-    
-    // Create floating control panel button
-    const controlButton = mainContainer.createDiv('graph-control-button');
-    setIcon(controlButton, 'settings');
-    
-    // Create control panel (hidden by default)
-    const controlPanel = mainContainer.createDiv('graph-control-panel');
-    controlPanel.style.display = 'none';
-    
-    // Add control panel header
-    const controlHeader = controlPanel.createDiv('control-panel-header');
-    controlHeader.createSpan({ text: 'Graph Controls', cls: 'control-panel-title' });
-    const closeButton = controlHeader.createDiv('control-panel-close');
-    setIcon(closeButton, 'x');
-    
-    // Create controls container
-    const controlsContainer = controlPanel.createDiv('controls-container');
-    this.controls = new GraphControls(controlsContainer, this.plugin, this);
-    
-    // Toggle control panel on button click
-    controlButton.addEventListener('click', () => {
-        if (controlPanel.style.display === 'none') {
-            controlPanel.style.display = 'flex';
-            controlButton.style.display = 'none';
-        }
-    });
-    
-    // Close control panel on X click
-    closeButton.addEventListener('click', () => {
-        controlPanel.style.display = 'none';
-        controlButton.style.display = 'flex';
-    });
-    
-    // Initialize renderer
-    this.renderer = new GraphRenderer(graphContainer, this.plugin, this);
-    
-    // Load initial data
-    await this.loadGraphData();
-    
-    // Initialize the graph
-    this.renderer.initialize(this.nodes, this.links);
-}
+        const resetButton = actionsContainer.createDiv('graph-control-close');
+        setIcon(resetButton, 'reset');
+        const closeX = actionsContainer.createDiv('graph-control-close');
+        setIcon(closeX, 'x');
+        
+        closeX.addEventListener('click', () => {
+            controlPanelContainer.style.display = 'none';
+            controlToggle.style.display = 'flex';
+        });
+        
+        // Create controls content
+        const controlsContent = controlPanelContainer.createDiv('graph-controls-content');
+        this.controls = new GraphControls(controlsContent, this.plugin, this);
+        
+        // Initialize renderer
+        this.renderer = new GraphRenderer(graphContainer, this.plugin, this);
+        
+        // Load initial data
+        await this.loadGraphData();
+        
+        // Initialize the graph
+        this.renderer.initialize(this.nodes, this.links);
+    }
     
 async loadGraphData() {
     const files = this.app.vault.getMarkdownFiles();
