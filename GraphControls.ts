@@ -1,4 +1,4 @@
-import { setIcon } from 'obsidian';
+import { setIcon, SliderComponent } from 'obsidian';
 import type CombinedPlugin from './main';
 import type { BetterGraphView } from './GraphView';
 
@@ -181,24 +181,23 @@ export class GraphControls {
         const container = parent.createDiv('slider-container');
         container.createEl('span', { text: label, cls: 'slider-label' });
         
-        const slider = container.createEl('input', {
-            type: 'range',
-            cls: 'slider'
-        }) as HTMLInputElement;
-        slider.min = min.toString();
-        slider.max = max.toString();
-        slider.step = step.toString();
-        slider.value = value.toString();
-        slider.style.width = '100%';
-
+        const slider = new SliderComponent(container)
+            .setLimits(min, max, step)
+            .setValue(value)
+            .setDynamicTooltip();
         
-        slider.addEventListener('input', () => {
-            onInput(parseFloat(slider.value));
+        slider.sliderEl.addClass('slider');
+        slider.sliderEl.style.width = '100%';
+
+        // Handle real-time updates (dragging)
+        slider.sliderEl.addEventListener('input', () => {
+            onInput(slider.getValue());
         });
 
+        // Handle final value change (release)
         if (onChange) {
-            slider.addEventListener('change', () => {
-                onChange(parseFloat(slider.value));
+            slider.onChange((val) => {
+                onChange(val);
             });
         }
     }

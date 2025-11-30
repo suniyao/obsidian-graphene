@@ -54,24 +54,24 @@ export const DEFAULT_SETTINGS: BetterGraphSettings = {
     // pineconeIndexName: '',
     
     // Embedding Settings
-    useEmbeddings: false,
-    similarityThreshold: 0.7,
+    useEmbeddings: true,
+    similarityThreshold: 0.8,
     embeddingWordLimit: 100,
-    embeddingWordSkip: 0,
+    embeddingWordSkip: 10,
     excludeHeadingsFromEmbedding: true,
-    maxSimilarLinksPerNode: 12,
-    dynamicSimilarityPruning: false,
+    maxSimilarLinksPerNode: 10,
+    dynamicSimilarityPruning: true,
     // Local embedding defaults
-    useLocalEmbeddings: false,
+    useLocalEmbeddings: true,
     localEmbeddingEndpoint: 'http://127.0.0.1:8000/embed',
     localModelName: 'thenlper/gte-large',
     
     // Graph Display - Updated physics values
     nodeSize: 6,
-    linkDistance: 80,      // Reduced from 100
-    repulsionForce: 500,   // Increased from 300
-    centerForce: 0.1,      // Reduced from 0.3
-    linkForce: 0.5,        // Added default
+    linkDistance: 100,      // Reduced from 100
+    repulsionForce: 100,   // Increased from 300
+    centerForce: 0.8,      // Reduced from 0.3
+    linkForce: 0.05,        // Added default
     showArrows: false,     // Added default
     textFadeThreshold: 0.5, // Added default
     showParticleAnimation: true, // Added default
@@ -83,10 +83,10 @@ export const DEFAULT_SETTINGS: BetterGraphSettings = {
     showOrphans: true,     // Added default
 
     // Link Appearance
-    defaultLinkThickness: 2,
-    minLinkThickness: 0.5,
-    maxLinkThickness: 8,
-    linkThickness: {},
+    defaultLinkThickness: 1,
+    // minLinkThickness: 0.5,
+    // maxLinkThickness: 8,
+    // linkThickness: {},
     dottedLinkThickness: 1.5,
 };
 
