@@ -29,9 +29,9 @@
 /* Graph Control Panel */
 .graph-control-panel {
     position: absolute;
-    top: 8px;
-    right: 8px;
-    width: 260px;
+    top: 0px;
+    right: 0px;
+    width: 240px;
     max-height: calc(100% - 16px);
     background: var(--background-primary);
     border: 1px solid var(--background-modifier-border);
@@ -46,7 +46,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 12px;
+    padding: 8px 8px 8px 16px;
     border-bottom: 1px solid var(--background-modifier-border);
     flex-shrink: 0;
 }
@@ -141,7 +141,7 @@
 }
 
 .section-content {
-    padding: 8px 12px;
+    padding: 8px 14px;
 }
 
 /* Search Input */

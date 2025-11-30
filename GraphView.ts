@@ -32,7 +32,7 @@ export class BetterGraphView extends ItemView {
     }
 
     getDisplayText() {
-        return "Better Graph View";
+        return "Graphene";
     }
 
     getIcon() {
@@ -74,12 +74,16 @@ export class BetterGraphView extends ItemView {
         // Create close button inside panel
         const controlHeader = controlPanelContainer.createDiv('graph-control-header');
         const filterTitle = controlHeader.createDiv('graph-control-title');
-        setIcon(filterTitle, 'chevron-down');
-        filterTitle.createSpan({ text: 'Filters' });
+        // setIcon(filterTitle, 'chevron-down');
+        filterTitle.createSpan({ text: 'Settings' });
         
-        const closeButton = controlHeader.createDiv('graph-control-close');
-        setIcon(closeButton, 'refresh-cw');
-        const closeX = controlHeader.createDiv('graph-control-close');
+        const actionsContainer = controlHeader.createDiv('graph-control-actions');
+        actionsContainer.style.display = 'flex';
+        actionsContainer.style.gap = '4px';
+
+        const resetButton = actionsContainer.createDiv('graph-control-close');
+        setIcon(resetButton, 'reset');
+        const closeX = actionsContainer.createDiv('graph-control-close');
         setIcon(closeX, 'x');
         
         closeX.addEventListener('click', () => {

@@ -17,97 +17,25 @@ export class GraphControls {
     private render() {
         this.container.empty();
 
-        // Filters Section (with action buttons aligned right)
-        this.createSection('Filters', (content) => {
-            // Header with buttons on the right
-            const headerRow = content.createDiv('filters-header');
-            headerRow.style.display = 'flex';
-            headerRow.style.justifyContent = 'space-between';
-            headerRow.style.alignItems = 'center';
-            headerRow.style.marginBottom = '12px';
-            
-            const buttonsContainer = headerRow.createDiv('filters-actions');
-            buttonsContainer.style.display = 'flex';
-            buttonsContainer.style.gap = '8px';
-            
-            // Reset button
-            const resetButton = buttonsContainer.createDiv('reset-button');
-            resetButton.style.cursor = 'pointer';
-            resetButton.style.padding = '4px 8px';
-            resetButton.style.borderRadius = '3px';
-            resetButton.style.backgroundColor = 'var(--interactive-normal)';
-            resetButton.style.fontSize = '12px';
-            resetButton.title = 'Reset filters';
-            setIcon(resetButton, 'rotate-ccw');
-            
-            // Close button
-            const closeButton = buttonsContainer.createDiv('close-button');
-            closeButton.style.cursor = 'pointer';
-            closeButton.style.padding = '4px';
-            closeButton.style.borderRadius = '3px';
-            closeButton.style.backgroundColor = 'var(--interactive-normal)';
-            closeButton.title = 'Close';
-            setIcon(closeButton, 'x');
-
-            // Search
-            const searchContainer = content.createDiv('search-container');
-            const searchInput = searchContainer.createEl('input', {
-                type: 'text',
-                placeholder: 'Search files...',
-                cls: 'search-input'
-            });
-            const searchIcon = searchContainer.createDiv('search-icon');
-            setIcon(searchIcon, 'search');
-
-            // Tags toggle
+        // Display Section
+        this.createSection('Display', (content) => {
             this.createToggle(content, 'Tags', this.plugin.settings.showTags, async (enabled) => {
                 this.plugin.settings.showTags = enabled;
                 this.view.filters.showTags = enabled;
                 await this.plugin.saveSettings();
                 await this.view.refresh();
             });
-
-            // Attachments toggle
-            this.createToggle(content, 'Attachments', this.plugin.settings.showAttachments, async (enabled) => {
-                this.plugin.settings.showAttachments = enabled;
-                this.view.filters.showAttachments = enabled;
-                await this.plugin.saveSettings();
-                await this.view.refresh();
-            });
-
-            // Existing files only
-            this.createToggle(content, 'Existing files only', this.plugin.settings.existingFilesOnly, async (enabled) => {
-                this.plugin.settings.existingFilesOnly = enabled;
-                this.view.filters.existingFilesOnly = enabled;
-                await this.plugin.saveSettings();
-                if (this.view.renderer) this.view.renderer.applyNodeVisibility();
-            });
-
-            // Orphans
-            this.createToggle(content, 'Orphans', this.plugin.settings.showOrphans, async (enabled) => {
-                this.plugin.settings.showOrphans = enabled;
-                this.view.filters.showOrphans = enabled;
-                await this.plugin.saveSettings();
-                if (this.view.renderer) this.view.renderer.applyNodeVisibility();
-            });
-        });
-
-        // Groups Section
-        this.createSection('Groups', (content) => {
-            const newGroupBtn = content.createEl('button', {
-                text: 'New group',
-                cls: 'mod-cta'
-            });
-            newGroupBtn.style.width = '100%';
-        });
-
-        // Display Section
-        this.createSection('Display', (content) => {
             // Arrows
             this.createToggle(content, 'Arrows', this.plugin.settings.showArrows || false, async (enabled) => {
                 this.plugin.settings.showArrows = enabled;
                 await this.plugin.saveSettings();
                 if (this.view.renderer) this.view.renderer.toggleArrows(enabled);
+            });
+            // Particle Animation
+            this.createToggle(content, 'Particle Animation', this.plugin.settings.showParticleAnimation !== false, async (enabled) => {
+                this.plugin.settings.showParticleAnimation = enabled;
+                await this.plugin.saveSettings();
+                if (this.view.renderer) this.view.renderer.toggleParticleAnimation(enabled);
             });
 
             // Text fade threshold
@@ -141,23 +69,16 @@ export class GraphControls {
             });
 
             // Animate button
-            const animateBtn = content.createEl('button', {
-                text: 'Animate',
-                cls: 'mod-cta'
-            });
-            animateBtn.style.width = '100%';
-            animateBtn.addEventListener('click', () => {
-                if (this.view.renderer) {
-                    this.view.renderer.toggleAnimation(true);
-                }
-            });
-
-            // Particle Animation
-            this.createToggle(content, 'Particle Animation', this.plugin.settings.showParticleAnimation !== false, async (enabled) => {
-                this.plugin.settings.showParticleAnimation = enabled;
-                await this.plugin.saveSettings();
-                if (this.view.renderer) this.view.renderer.toggleParticleAnimation(enabled);
-            });
+            // const animateBtn = content.createEl('button', {
+            //     text: 'Animate',
+            //     cls: 'mod-cta'
+            // });
+            // animateBtn.style.width = '100%';
+            // animateBtn.addEventListener('click', () => {
+            //     if (this.view.renderer) {
+            //         this.view.renderer.toggleAnimation(true);
+            //     }
+            // });
         });
 
         // Forces Section
@@ -258,6 +179,8 @@ export class GraphControls {
         slider.max = max.toString();
         slider.step = step.toString();
         slider.value = value.toString();
+        slider.style.width = '100%';
+
         
         slider.addEventListener('input', () => {
             onInput(parseFloat(slider.value));
