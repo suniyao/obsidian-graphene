@@ -76,7 +76,7 @@ export default class CombinedPlugin extends Plugin {
         // Better Graph commands
         this.addCommand({
             id: 'open-better-graph-view',
-            name: 'Open Better Graph View',
+            name: 'Open Graphene View',
             callback: () => {
                 this.activateView();
             }
