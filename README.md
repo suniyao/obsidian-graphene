@@ -51,7 +51,7 @@ If you prefer to keep your data local or avoid API costs, you can run the includ
    ```
 3. **Run the Server**:
    ```bash
-   uvicorn local_embed_server:app --host 127.0.0.1 --port 8000
+   uvicorn local_embedding_server:app --host 127.0.0.1 --port 8000
    ```
 4. **Configure Plugin**:
    - In Graphene settings, set the **Embedding Provider** to **Local**.
