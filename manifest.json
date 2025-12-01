@@ -3,7 +3,7 @@
 	"name": "Graphene",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "Creates a semantic graph based on content similarity using vector embeddings",
+	"description": "Creates a semantic graph based on content similarity using vector embeddings.",
 	"author": "Steph Yao",
 	"authorUrl": "https://stephyao.com",
 	"fundingUrl": "https://buymeacoffee.com/stephsnyaow",
