@@ -84,9 +84,9 @@ export const DEFAULT_SETTINGS: BetterGraphSettings = {
 
     // Link Appearance
     defaultLinkThickness: 1,
-    // minLinkThickness: 0.5,
-    // maxLinkThickness: 8,
-    // linkThickness: {},
+    minLinkThickness: 0.5,
+    maxLinkThickness: 8,
+    linkThickness: {},
     dottedLinkThickness: 1.5,
 };
 
@@ -107,9 +107,9 @@ export interface GraphNode extends d3.SimulationNodeDatum {
     status?: 'up-to-date' | 'modified' | 'new' | 'processing'; // Add this
 }
 
-export interface GraphLink {
-    source: string;
-    target: string;
+export interface GraphLink extends d3.SimulationLinkDatum<GraphNode> {
+    source: string | GraphNode;
+    target: string | GraphNode;
     id: string;
     similarity?: number;
     thickness?: number;

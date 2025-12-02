@@ -32,7 +32,7 @@ export class GraphControls {
                 if (this.view.renderer) this.view.renderer.toggleArrows(enabled);
             });
             // Particle Animation
-            this.createToggle(content, 'Particle Animation', this.plugin.settings.showParticleAnimation !== false, async (enabled) => {
+            this.createToggle(content, 'Particle animation', this.plugin.settings.showParticleAnimation !== false, async (enabled) => {
                 this.plugin.settings.showParticleAnimation = enabled;
                 await this.plugin.saveSettings();
                 if (this.view.renderer) this.view.renderer.toggleParticleAnimation(enabled);
@@ -59,7 +59,7 @@ export class GraphControls {
             });
 
             // Solid link thickness
-            this.createSlider(content, 'Solid Link Thickness', 0.5, 10, 0.5, 
+            this.createSlider(content, 'Solid link thickness', 0.5, 10, 0.5, 
                 this.plugin.settings.defaultLinkThickness, (value) => {
                 this.plugin.settings.defaultLinkThickness = value;
                 if (this.view.renderer) this.view.renderer.updateLinkThickness(value);
@@ -69,7 +69,7 @@ export class GraphControls {
             });
 
             // Dotted link thickness
-            this.createSlider(content, 'Dotted Link Thickness', 0.5, 4, 0.25, 
+            this.createSlider(content, 'Dotted link thickness', 0.5, 4, 0.25, 
                 this.plugin.settings.dottedLinkThickness ?? Math.max(0.5, this.plugin.settings.defaultLinkThickness / 2), (value) => {
                 this.plugin.settings.dottedLinkThickness = value;
                 if (this.view.renderer) this.view.renderer.updateDottedLinkSize(value);
@@ -145,18 +145,26 @@ export class GraphControls {
         header.createSpan({ text: title, cls: 'section-title' });
         
         const content = section.createDiv('section-content');
-        content.style.display = 'none';
+        content.addClass('is-hidden');
         
         // Filters starts expanded
         if (title === 'Filters') {
-            content.style.display = 'block';
+            content.removeClass('is-hidden');
+            content.addClass('is-visible');
             setIcon(chevron, 'chevron-down');
         }
         
         header.addEventListener('click', () => {
-            const isOpen = content.style.display === 'block';
-            content.style.display = isOpen ? 'none' : 'block';
-            setIcon(chevron, isOpen ? 'chevron-right' : 'chevron-down');
+            const isOpen = content.hasClass('is-visible');
+            if (isOpen) {
+                content.removeClass('is-visible');
+                content.addClass('is-hidden');
+                setIcon(chevron, 'chevron-right');
+            } else {
+                content.removeClass('is-hidden');
+                content.addClass('is-visible');
+                setIcon(chevron, 'chevron-down');
+            }
         });
         
         buildContent(content);
@@ -187,7 +195,7 @@ export class GraphControls {
             .setDynamicTooltip();
         
         slider.sliderEl.addClass('slider');
-        slider.sliderEl.style.width = '100%';
+        slider.sliderEl.addClass('w-full');
 
         // Handle real-time updates (dragging)
         slider.sliderEl.addEventListener('input', () => {

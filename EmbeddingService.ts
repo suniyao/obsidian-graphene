@@ -1,4 +1,4 @@
-import { Notice, TFile } from 'obsidian';
+import { Notice, TFile, App, requestUrl, normalizePath } from 'obsidian';
 import { BetterGraphSettings, FileEmbeddingStatus, EmbeddingCache } from './types';
 
 export class EmbeddingService {
@@ -8,16 +8,20 @@ export class EmbeddingService {
     // private pineconeIndexName: string;
     private useLocalEmbeddings: boolean;
     private localEmbeddingEndpoint: string;
-    private embeddingCache: EmbeddingCache;
-    private app: any;
+    private embeddingWordSkip: number;
+    private excludeHeadingsFromEmbedding: boolean;
+    public embeddingCache: EmbeddingCache;
+    private app: App;
 
-    constructor(settings: BetterGraphSettings, app: any) {
+    constructor(settings: BetterGraphSettings, app: App) {
         this.openaiApiKey = settings.openaiApiKey;
         // this.pineconeApiKey = settings.pineconeApiKey;
         // this.pineconeEnvironment = settings.pineconeEnvironment;
         // this.pineconeIndexName = settings.pineconeIndexName;
         this.useLocalEmbeddings = !!settings.useLocalEmbeddings;
         this.localEmbeddingEndpoint = settings.localEmbeddingEndpoint || 'http://127.0.0.1:8000/embed';
+        this.embeddingWordSkip = settings.embeddingWordSkip || 0;
+        this.excludeHeadingsFromEmbedding = settings.excludeHeadingsFromEmbedding ?? true;
         this.app = app;
         this.embeddingCache = {
             version: '1.0.0',
@@ -41,16 +45,13 @@ export class EmbeddingService {
         // this.pineconeIndexName = settings.pineconeIndexName;
         this.useLocalEmbeddings = !!settings.useLocalEmbeddings;
         this.localEmbeddingEndpoint = settings.localEmbeddingEndpoint || this.localEmbeddingEndpoint;
+        this.embeddingWordSkip = settings.embeddingWordSkip || 0;
+        this.excludeHeadingsFromEmbedding = settings.excludeHeadingsFromEmbedding ?? true;
     }
 
     async loadCache(): Promise<void> {
         try {
-            const cacheFile = this.app.vault.adapter.path.join(
-                this.app.vault.configDir,
-                'plugins',
-                'graphene',
-                'embedding-cache.json'
-            );
+            const cacheFile = normalizePath(`${this.app.vault.configDir}/plugins/graphene/embedding-cache.json`);
             
             if (await this.app.vault.adapter.exists(cacheFile)) {
                 const data = await this.app.vault.adapter.read(cacheFile);
@@ -63,12 +64,7 @@ export class EmbeddingService {
 
     async saveCache(): Promise<void> {
         try {
-            const cacheFile = this.app.vault.adapter.path.join(
-                this.app.vault.configDir,
-                'plugins',
-                'graphene',
-                'embedding-cache.json'
-            );
+            const cacheFile = normalizePath(`${this.app.vault.configDir}/plugins/graphene/embedding-cache.json`);
             
             await this.app.vault.adapter.write(
                 cacheFile,
@@ -140,8 +136,8 @@ export class EmbeddingService {
             return;
         }
         
-        console.log(`[Embedding] Processing ${needsUpdate.length} files`);
-        console.log(`[Embedding] API Key format: ${this.openaiApiKey?.substring(0, 20)}...`);
+        console.debug(`[Embedding] Processing ${needsUpdate.length} files`);
+        console.debug(`[Embedding] API Key format: ${this.openaiApiKey?.substring(0, 20)}...`);
         
         let processed = 0;
         let failed = 0;
@@ -161,18 +157,18 @@ export class EmbeddingService {
                 const content = await this.app.vault.read(file);
                 const cleanedText = this.extractHeadingsAndFirstWords(content);
                 
-                console.log(`[Embedding] Processing ${file.path}, text length: ${cleanedText.length}`);
+                console.debug(`[Embedding] Processing ${file.path}, text length: ${cleanedText.length}`);
                 
                 // Get embedding
                 const embedding = await this.getEmbedding(cleanedText);
                 
-                console.log(`[Embedding] Got embedding for ${file.path}, length: ${embedding?.length}`);
+                console.debug(`[Embedding] Got embedding for ${file.path}, length: ${embedding?.length}`);
                 
                 if (embedding && embedding.length > 0) {
                     this.embeddingCache.embeddings[file.path] = embedding;
                     this.embeddingCache.files[file.path].status = 'up-to-date';
                     this.embeddingCache.files[file.path].embeddingGenerated = Date.now();
-                    console.log(`[Embedding] Stored embedding for ${file.path}`);
+                    console.debug(`[Embedding] Stored embedding for ${file.path}`);
                     processed++;
                 } else {
                     console.warn(`[Embedding] Empty embedding returned for ${file.path}`);
@@ -212,7 +208,7 @@ export class EmbeddingService {
         
         const message = `Embeddings: ${processed} successful, ${failed} failed`;
         new Notice(message);
-        console.log(`[Embedding] Complete: ${message}`);
+        console.debug(`[Embedding] Complete: ${message}`);
     }
 
     async clearCache(): Promise<void> {
@@ -231,16 +227,16 @@ export class EmbeddingService {
 
         if (useLocal) {
             try {
-                const resp = await fetch(localEndpoint, {
+                const resp = await requestUrl({
+                    url: localEndpoint,
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ text })
                 });
-                if (!resp.ok) {
-                    const err = await resp.text();
-                    throw new Error(`Local embedding error: ${resp.status} ${resp.statusText} - ${err}`);
+                if (resp.status !== 200) {
+                    throw new Error(`Local embedding error: ${resp.status} - ${resp.text}`);
                 }
-                const data = await resp.json();
+                const data = resp.json;
                 if (!data || !Array.isArray(data.embedding)) {
                     throw new Error('Local embedding server returned invalid payload');
                 }
@@ -256,7 +252,8 @@ export class EmbeddingService {
         }
 
         try {
-            const response = await fetch('https://api.openai.com/v1/embeddings', {
+            const response = await requestUrl({
+                url: 'https://api.openai.com/v1/embeddings',
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${this.openaiApiKey}`,
@@ -268,12 +265,12 @@ export class EmbeddingService {
                 })
             });
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(`OpenAI API error: ${response.status} ${response.statusText} - ${errorData.error?.message || 'Unknown error'}`);
+            if (response.status !== 200) {
+                const errorData = response.json;
+                throw new Error(`OpenAI API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
             }
 
-            const data = await response.json();
+            const data = response.json;
             const vec: number[] = data.data[0].embedding;
             // Normalize to unit vector to align with local model normalization
             let norm = 0;
@@ -286,7 +283,7 @@ export class EmbeddingService {
         }
     }
 
-    async storeEmbedding(id: string, embedding: number[], metadata: any = {}): Promise<void> {
+    async storeEmbedding(id: string, embedding: number[], metadata: Record<string, unknown> = {}): Promise<void> {
         // if (!this.pineconeApiKey || !this.pineconeEnvironment || !this.pineconeIndexName) {
         //     // Skip Pinecone storage if not configured
         //     return;
@@ -343,9 +340,8 @@ export class EmbeddingService {
     }
 
     extractHeadingsAndFirstWords(content: string, wordLimit: number = 100): string {
-        const settings = (this.app?.plugins?.getPlugin?.('graphene')?.settings) as any;
-        const wordSkip = settings?.embeddingWordSkip || 0;
-        const excludeHeadings = settings?.excludeHeadingsFromEmbedding ?? true;
+        const wordSkip = this.embeddingWordSkip;
+        const excludeHeadings = this.excludeHeadingsFromEmbedding;
 
         // Extract all headings
         const headingRegex = /^#{1,6}\s+(.+)$/gm;

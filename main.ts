@@ -4,16 +4,12 @@ import { CombinedSettingTab } from './GraphSettings';
 import { BetterGraphSettings, DEFAULT_SETTINGS } from './types';
 import { EmbeddingService } from './EmbeddingService';
 
-interface CombinedPluginSettings extends BetterGraphSettings {
-    // All settings are already in BetterGraphSettings
-}
-
-const COMBINED_DEFAULT_SETTINGS: CombinedPluginSettings = {
+const COMBINED_DEFAULT_SETTINGS: BetterGraphSettings = {
     ...DEFAULT_SETTINGS
 }
 
 export default class CombinedPlugin extends Plugin {
-    settings: CombinedPluginSettings;
+    settings: BetterGraphSettings;
     embeddingService: EmbeddingService;
     embeddingStatusEl: HTMLElement | null = null;
 
@@ -76,7 +72,7 @@ export default class CombinedPlugin extends Plugin {
         // Better Graph commands
         this.addCommand({
             id: 'open-better-graph-view',
-            name: 'Open Graphene View',
+            name: 'Open graph view',
             callback: () => {
                 this.activateView();
             }
@@ -84,7 +80,7 @@ export default class CombinedPlugin extends Plugin {
 
         this.addCommand({
             id: 'generate-embeddings',
-            name: 'Generate Embeddings for All Notes',
+            name: 'Generate embeddings for all notes',
             callback: async () => {
                 await this.generateEmbeddingsForAllNotes();
             }
@@ -122,7 +118,7 @@ export default class CombinedPlugin extends Plugin {
      * into the plugin's persistent data.json so GraphView can access them via getEmbeddingLocally.
      * Also performs a flattening migration if an older nested embeddings structure is detected.
      */
-    private async syncIncrementalEmbeddingsToData(): Promise<void> {
+    public async syncIncrementalEmbeddingsToData(): Promise<void> {
         try {
             const data = await this.loadData() || {};
             // Migration: if data.embeddings has a nested shape { version, embeddings: {..} }
@@ -130,7 +126,7 @@ export default class CombinedPlugin extends Plugin {
                 data.embeddings = data.embeddings.embeddings; // flatten
             }
             if (!data.embeddings) data.embeddings = {};
-            const cacheEmbeddings = (this.embeddingService as any).embeddingCache?.embeddings || {};
+            const cacheEmbeddings = this.embeddingService.embeddingCache?.embeddings || {};
             let newCount = 0;
             for (const [path, vector] of Object.entries(cacheEmbeddings)) {
                 if (Array.isArray(vector) && vector.length > 0) {
@@ -299,7 +295,7 @@ updateEmbeddingStatusUI(): void {
                         
                         successCount++;
                     } else {
-                        console.log(`Skipping empty file: ${file.path}`);
+                        console.debug(`Skipping empty file: ${file.path}`);
                     }
                 } catch (error) {
                     console.error(`Error processing file ${file.path}:`, error);
@@ -324,7 +320,7 @@ updateEmbeddingStatusUI(): void {
         }
     }
 
-    async storeEmbeddingMetadata(filePath: string, metadata: any): Promise<void> {
+    async storeEmbeddingMetadata(filePath: string, metadata: Record<string, unknown>): Promise<void> {
         const data = await this.loadData() || {};
         if (!data.embeddingMetadata) {
             data.embeddingMetadata = {};
@@ -364,6 +360,6 @@ updateEmbeddingStatusUI(): void {
     }
 
     onunload() {
-        this.app.workspace.detachLeavesOfType(VIEW_TYPE_GRAPH);
+        // this.app.workspace.detachLeavesOfType(VIEW_TYPE_GRAPH);
     }
 }

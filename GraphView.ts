@@ -58,7 +58,7 @@ export class BetterGraphView extends ItemView {
         
         // Create control panel container
         const controlPanelContainer = mainContainer.createDiv('graph-control-panel');
-        controlPanelContainer.style.display = 'none';
+        controlPanelContainer.addClass('is-hidden');
         
         // Create control toggle button
         const controlToggle = mainContainer.createDiv('graph-control-toggle');
@@ -66,9 +66,14 @@ export class BetterGraphView extends ItemView {
         
         // Toggle control panel
         controlToggle.addEventListener('click', () => {
-            const isOpen = controlPanelContainer.style.display === 'flex';
-            controlPanelContainer.style.display = isOpen ? 'none' : 'flex';
-            controlToggle.style.display = isOpen ? 'flex' : 'none';
+            const isHidden = controlPanelContainer.hasClass('is-hidden');
+            if (isHidden) {
+                controlPanelContainer.removeClass('is-hidden');
+                controlToggle.addClass('is-hidden');
+            } else {
+                controlPanelContainer.addClass('is-hidden');
+                controlToggle.removeClass('is-hidden');
+            }
         });
         
         // Create close button inside panel
@@ -78,8 +83,7 @@ export class BetterGraphView extends ItemView {
         filterTitle.createSpan({ text: 'Settings' });
         
         const actionsContainer = controlHeader.createDiv('graph-control-actions');
-        actionsContainer.style.display = 'flex';
-        actionsContainer.style.gap = '4px';
+        actionsContainer.addClass('flex-row-gap-4');
 
         const resetButton = actionsContainer.createDiv('graph-control-close');
         setIcon(resetButton, 'reset');
@@ -87,8 +91,8 @@ export class BetterGraphView extends ItemView {
         setIcon(closeX, 'x');
         
         closeX.addEventListener('click', () => {
-            controlPanelContainer.style.display = 'none';
-            controlToggle.style.display = 'flex';
+            controlPanelContainer.addClass('is-hidden');
+            controlToggle.removeClass('is-hidden');
         });
         
         // Create controls content
@@ -196,7 +200,7 @@ async loadGraphData() {
     
     // Combine all nodes
     this.nodes = [...Array.from(nodeMap.values()), ...Array.from(tagNodes.values())];
-    console.log('Total nodes:', this.nodes.length, 'Tag nodes:', tagNodes.size);
+    console.debug('Total nodes:', this.nodes.length, 'Tag nodes:', tagNodes.size);
     // Create links
     this.links = [];
     
@@ -211,7 +215,7 @@ async loadGraphData() {
     // Create tag links
     if (this.filters.showTags) {
         this.createTagLinks(files, nodeMap, tagNodes);
-        console.log('Tag links created:', this.links.filter(l => l.type === 'tag-link').length);
+        console.debug('Tag links created:', this.links.filter(l => l.type === 'tag-link').length);
     }
 
     if (this.renderer && this.renderer.isInitialized) {
@@ -281,7 +285,7 @@ createTagLinks(files: TFile[], nodeMap: Map<string, GraphNode>, tagNodes: Map<st
     });
 }
 
-    async createEmbeddingBasedLinks(nodeMap: Map<string, GraphNode>) {
+    createEmbeddingBasedLinks(nodeMap: Map<string, GraphNode>) {
         const nodesArray = Array.from(nodeMap.values());
         
         // Build a set of existing manual link pairs for quick lookup
@@ -402,5 +406,6 @@ createTagLinks(files: TFile[], nodeMap: Map<string, GraphNode>, tagNodes: Map<st
         if (this.renderer) {
             this.renderer.destroy();
         }
+        return Promise.resolve();
     }
 }

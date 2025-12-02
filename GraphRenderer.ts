@@ -40,7 +40,7 @@ export class GraphRenderer {
 
     isInitialized: boolean = false;
 
-    private particleAnimationTimer: any;
+    private particleAnimationTimer: d3.Timer | null = null;
 
     private startParticleAnimation() {
         if (this.particleAnimationTimer) this.particleAnimationTimer.stop();
@@ -49,7 +49,7 @@ export class GraphRenderer {
             if (!this.isInitialized) return;
             
             this.linkElements.selectAll('line.similarity-link')
-                .style('stroke-dashoffset', function(d: any) {
+                .style('stroke-dashoffset', function(d: GraphLink) {
                     const sim = d.similarity || 0;
                     // Speed factor. 
                     // Higher sim -> faster.
@@ -270,11 +270,11 @@ export class GraphRenderer {
         connectedNodeIds.add(hoveredNode.id);
         
         this.links.forEach(link => {
-            const sourceId = typeof link.source === 'string' ? link.source : (link.source as any).id;
-            const targetId = typeof link.target === 'string' ? link.target : (link.target as any).id;
+            const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
+            const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
             
             // Check if the link meets the similarity threshold (or is not a similarity link)
-            const type2 = (link as any).type;
+            const type2 = link.type;
             const isManual2 = type2 === 'manual-link';
             const isTagLink2 = type2 === 'tag-link';
             const meetsThreshold2 = isManual2 || isTagLink2 || (link.similarity !== undefined && link.similarity > this.plugin.settings.similarityThreshold);
@@ -312,10 +312,10 @@ export class GraphRenderer {
 
         // Update link styling - highlight if edge pair contains hovered node
         const showArrows2 = this.showArrows;
-        this.linkElements.each(function(d: any) {
+        this.linkElements.each(function(d: GraphLink) {
             const group = d3.select(this);
-            const sourceId = typeof d.source === 'string' ? d.source : d.source.id;
-            const targetId = typeof d.target === 'string' ? d.target : d.target.id;
+            const sourceId = typeof d.source === 'string' ? d.source : (d.source as GraphNode).id;
+            const targetId = typeof d.target === 'string' ? d.target : (d.target as GraphNode).id;
             const edgePair = `${sourceId}|${targetId}`;
             // An edge is highlighted if it's in our connected edges set (already filtered to involve hovered node)
             const highlight = connectedEdges.has(edgePair);
@@ -643,7 +643,7 @@ export class GraphRenderer {
             .data(this.nodes)
             .join('g')
             .attr('class', 'node')
-            .call(this.drag() as any);
+            .call(this.drag());
 
         // Add circles
         node.append('circle')
@@ -693,7 +693,7 @@ export class GraphRenderer {
         const similarityThreshold = this.plugin.settings.similarityThreshold;
         const getNodeRadius = (n: GraphNode) => this.getNodeRadius(n);
         const showArrows = this.showArrows;
-        this.linkElements.each((d: any, index, groups) => {
+        this.linkElements.each((d: GraphLink, index, groups) => {
             const group = d3.select(groups[index]);
             const source = d.source as GraphNode;
             const target = d.target as GraphNode;
