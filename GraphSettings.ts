@@ -58,7 +58,7 @@ export class CombinedSettingTab extends PluginSettingTab {
         //         }));
 
         // Embedding Settings Section
-        containerEl.createEl('h3', { text: 'Embedding Settings' });
+        containerEl.createEl('h3', { text: 'Embedding settings' });
 
         // Provider selector: OpenAI vs Local
 

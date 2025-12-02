@@ -40,21 +40,21 @@ export class BetterGraphModal extends Modal {
         
         // Center graph button
         const centerBtn = controlPanel.createEl('button', { 
-            text: 'Center Graph',
+            text: 'Center graph',
             cls: 'mod-cta'
         });
         centerBtn.onclick = () => this.centerGraph();
 
         // Reset zoom button
         const resetBtn = controlPanel.createEl('button', { 
-            text: 'Reset Zoom',
+            text: 'Reset zoom',
             cls: 'mod-cta'
         });
         resetBtn.onclick = () => this.resetZoom();
 
         // Edge thickness controls
         const thicknessPanel = container.createDiv({ cls: 'edge-panel' });
-        thicknessPanel.createEl('h3', { text: 'Edge Thickness' });
+        thicknessPanel.createEl('h3', { text: 'Edge thickness' });
 
         // Add thickness control for each link
         this.links.forEach(link => {
