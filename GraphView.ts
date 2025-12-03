@@ -209,7 +209,7 @@ async loadGraphData() {
     
     // Create embedding-based similarity links (if enabled)
     if (this.plugin.settings.useEmbeddings && this.nodes.some(n => n.embedding)) {
-        await this.createEmbeddingBasedLinks(nodeMap);
+        this.createEmbeddingBasedLinks(nodeMap);
     }
     
     // Create tag links

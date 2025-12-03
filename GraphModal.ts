@@ -28,7 +28,7 @@ export class BetterGraphModal extends Modal {
         this.createControls(controls);
 
         // Build graph data
-        await this.buildGraphData();
+        this.buildGraphData();
 
         // Create graph
         this.createGraph(container);
@@ -91,7 +91,7 @@ export class BetterGraphModal extends Modal {
         });
     }
 
-    async buildGraphData() {
+    buildGraphData() {
         const files = this.app.vault.getMarkdownFiles();
         const nodeMap = new Map<string, GraphNode>();
         const linkSet = new Set<string>();

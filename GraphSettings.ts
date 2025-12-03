@@ -58,7 +58,7 @@ export class CombinedSettingTab extends PluginSettingTab {
         //         }));
 
         // Embedding Settings Section
-        containerEl.createEl('h3', { text: 'Embedding settings' });
+        new Setting(containerEl).setName("Embedding settings").setHeading();
 
         // Provider selector: OpenAI vs Local
 
@@ -407,7 +407,8 @@ export class CombinedSettingTab extends PluginSettingTab {
         //         }));
 
         // Actions Section
-        containerEl.createEl('h3', { text: 'Actions' });
+        new Setting(containerEl).setName("Actions").setHeading();
+
 
         // In the CombinedSettingTab class, update the display method:
 
