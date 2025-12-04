@@ -1,6 +1,6 @@
 # Graphene
 ### A Semantic Graph View for Obsidian Based on Content Similarity Using Vector Embeddings
-<p align="center"><img width="406" height="422" alt="image" src="https://github.com/user-attachments/assets/035d31ba-1ab3-473b-8f91-8ee66679495b" /> <img width="406" height="422" alt="image" src="https://github.com/user-attachments/assets/3faf76b4-e81c-4551-8bec-398256a83b5c" /> </p>
+<p align="center"><img width="406" height="422" alt="image" src="https://github.com/user-attachments/assets/035d31ba-1ab3-473b-8f91-8ee66679495b" /> <img width="407" height="422" alt="image" src="https://github.com/user-attachments/assets/3faf76b4-e81c-4551-8bec-398256a83b5c" /> </p>
 Graphene transforms your Obsidian vault into an interactive, semantic knowledge graph. Unlike the standard graph view which only shows explicit links, Graphene uses vector embeddings to discover and visualize hidden connections between your notes based on their content similarity.
 
 ## Key Features
