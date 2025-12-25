@@ -1,5 +1,5 @@
 import { setIcon, SliderComponent } from 'obsidian';
-import type CombinedPlugin from './main';
+import type CombinedPlugin from '../main';
 import type { BetterGraphView } from './GraphView';
 
 export class GraphControls {

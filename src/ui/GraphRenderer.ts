@@ -1,9 +1,8 @@
 import * as d3 from 'd3';
 import { TFile } from 'obsidian';
-import type BetterGraphPlugin from './main';
 import type { BetterGraphView } from './GraphView';
-import { GraphNode, GraphLink } from './types';
-import CombinedPlugin from './main';
+import { GraphNode, GraphLink } from '../types';
+import CombinedPlugin from '../main';
 
 export class GraphRenderer {
     private container: HTMLElement;
@@ -32,7 +31,7 @@ export class GraphRenderer {
         return this.plugin.settings.nodeSize;
     }
 
-    constructor(container: HTMLElement, plugin: BetterGraphPlugin, view: BetterGraphView) {
+    constructor(container: HTMLElement, plugin: CombinedPlugin, view: BetterGraphView) {
         this.container = container;
         this.plugin = plugin;
         this.view = view;
