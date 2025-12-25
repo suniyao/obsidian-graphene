@@ -3,11 +3,9 @@ import { BetterGraphSettings, FileEmbeddingStatus, EmbeddingCache } from './type
 
 export class EmbeddingService {
     private openaiApiKey: string;
-    // private pineconeApiKey: string;
-    // private pineconeEnvironment: string;
-    // private pineconeIndexName: string;
-    private useLocalEmbeddings: boolean;
-    private localEmbeddingEndpoint: string;
+    private embeddingProvider: 'openai' | 'ollama';
+    private ollamaEndpoint: string;
+    private ollamaModel: string;
     private embeddingWordSkip: number;
     private excludeHeadingsFromEmbedding: boolean;
     public embeddingCache: EmbeddingCache;
@@ -15,11 +13,9 @@ export class EmbeddingService {
 
     constructor(settings: BetterGraphSettings, app: App) {
         this.openaiApiKey = settings.openaiApiKey;
-        // this.pineconeApiKey = settings.pineconeApiKey;
-        // this.pineconeEnvironment = settings.pineconeEnvironment;
-        // this.pineconeIndexName = settings.pineconeIndexName;
-        this.useLocalEmbeddings = !!settings.useLocalEmbeddings;
-        this.localEmbeddingEndpoint = settings.localEmbeddingEndpoint || 'http://127.0.0.1:8000/embed';
+        this.embeddingProvider = settings.embeddingProvider || 'ollama';
+        this.ollamaEndpoint = settings.ollamaEndpoint || 'http://localhost:11434';
+        this.ollamaModel = settings.ollamaModel || 'nomic-embed-text';
         this.embeddingWordSkip = settings.embeddingWordSkip || 0;
         this.excludeHeadingsFromEmbedding = settings.excludeHeadingsFromEmbedding ?? true;
         this.app = app;
@@ -40,11 +36,9 @@ export class EmbeddingService {
 
     updateSettings(settings: BetterGraphSettings) {
         this.openaiApiKey = settings.openaiApiKey;
-        // this.pineconeApiKey = settings.pineconeApiKey;
-        // this.pineconeEnvironment = settings.pineconeEnvironment;
-        // this.pineconeIndexName = settings.pineconeIndexName;
-        this.useLocalEmbeddings = !!settings.useLocalEmbeddings;
-        this.localEmbeddingEndpoint = settings.localEmbeddingEndpoint || this.localEmbeddingEndpoint;
+        this.embeddingProvider = settings.embeddingProvider || 'ollama';
+        this.ollamaEndpoint = settings.ollamaEndpoint || this.ollamaEndpoint;
+        this.ollamaModel = settings.ollamaModel || this.ollamaModel;
         this.embeddingWordSkip = settings.embeddingWordSkip || 0;
         this.excludeHeadingsFromEmbedding = settings.excludeHeadingsFromEmbedding ?? true;
     }
@@ -136,8 +130,7 @@ export class EmbeddingService {
             return;
         }
         
-        console.debug(`[Embedding] Processing ${needsUpdate.length} files`);
-        console.debug(`[Embedding] API Key format: ${this.openaiApiKey?.substring(0, 20)}...`);
+        console.debug(`[Embedding] Processing ${needsUpdate.length} files using provider: ${this.embeddingProvider}`);
         
         let processed = 0;
         let failed = 0;
@@ -221,32 +214,50 @@ export class EmbeddingService {
     }
 
     async getEmbedding(text: string): Promise<number[]> {
-        // Prefer local embeddings when enabled
-        const useLocal = this.useLocalEmbeddings;
-        const localEndpoint = this.localEmbeddingEndpoint;
-
-        if (useLocal) {
-            try {
-                const resp = await requestUrl({
-                    url: localEndpoint,
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text })
-                });
-                if (resp.status !== 200) {
-                    throw new Error(`Local embedding error: ${resp.status} - ${resp.text}`);
-                }
-                const data = resp.json;
-                if (!data || !Array.isArray(data.embedding)) {
-                    throw new Error('Local embedding server returned invalid payload');
-                }
-                return data.embedding as number[];
-            } catch (e) {
-                console.error('Failed to get local embedding, falling back to OpenAI:', e);
-                // If local fails, fall through to OpenAI path
-            }
+        if (this.embeddingProvider === 'ollama') {
+            return this.getOllamaEmbedding(text);
+        } else {
+            return this.getOpenAIEmbedding(text);
         }
+    }
 
+    private async getOllamaEmbedding(text: string): Promise<number[]> {
+        try {
+            const response = await requestUrl({
+                url: `${this.ollamaEndpoint}/api/embeddings`,
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    model: this.ollamaModel,
+                    prompt: text
+                })
+            });
+
+            if (response.status !== 200) {
+                throw new Error(`Ollama error: ${response.status} - ${response.text}`);
+            }
+
+            const data = response.json;
+            if (!data || !Array.isArray(data.embedding)) {
+                throw new Error('Ollama returned invalid response - make sure the model is pulled');
+            }
+
+            const vec: number[] = data.embedding;
+            // Normalize to unit vector
+            let norm = 0;
+            for (const v of vec) norm += v * v;
+            norm = Math.sqrt(norm) || 1;
+            return vec.map(v => v / norm);
+        } catch (error) {
+            if (error instanceof Error && error.message.includes('ECONNREFUSED')) {
+                throw new Error('Cannot connect to Ollama. Make sure Ollama is running (ollama serve)');
+            }
+            console.error('Ollama embedding error:', error);
+            throw error;
+        }
+    }
+
+    private async getOpenAIEmbedding(text: string): Promise<number[]> {
         if (!this.openaiApiKey) {
             throw new Error('OpenAI API key not configured');
         }
@@ -272,13 +283,13 @@ export class EmbeddingService {
 
             const data = response.json;
             const vec: number[] = data.data[0].embedding;
-            // Normalize to unit vector to align with local model normalization
+            // Normalize to unit vector
             let norm = 0;
             for (const v of vec) norm += v * v;
             norm = Math.sqrt(norm) || 1;
             return vec.map(v => v / norm);
         } catch (error) {
-            console.error('Error getting embedding:', error);
+            console.error('OpenAI embedding error:', error);
             throw error;
         }
     }

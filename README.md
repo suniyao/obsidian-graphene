@@ -25,38 +25,33 @@ Graphene transforms your Obsidian vault into an interactive, semantic knowledge 
 
 ## Setup & Configuration
 
-To power the semantic connections, Graphene needs to generate vector embeddings for your notes. You can choose between using OpenAI or a local embedding server.
+To power the semantic connections, Graphene needs to generate vector embeddings for your notes. You can choose between Ollama (local, free) or OpenAI (cloud, paid).
 
-### Option 1: OpenAI (Easier but Paid)
-1. Go to **Settings > Graphene**.
-2. Enter your **OpenAI API Key**.
-3. Click **Generate Embeddings**.
+### Option 1: Ollama (Recommended - Free & Private)
+Ollama runs entirely on your machine with no API costs.
 
-### Option 2: Local Embedding Server (Free & Private)
-If you prefer to keep your data local or avoid API costs, you can run the included local embedding server.
+1. **Install Ollama**: Download from [ollama.ai](https://ollama.ai)
+2. **Pull an embedding model**:
+   ```bash
+   ollama pull nomic-embed-text
+   ```
+3. **Configure Plugin**:
+   - Go to **Settings > Graphene**
+   - Select **Ollama (local)** as the embedding provider
+   - Default endpoint is `http://localhost:11434` (change if needed)
+   - Default model is `nomic-embed-text`
+4. **Generate Embeddings**: Click **Generate all** in the settings
 
-1. **Prerequisites**: Python 3.8+ installed.
-2. **Setup**:
-   Navigate to the plugin folder in your terminal:
-   ```bash
-   cd .obsidian/plugins/graphene
-   ```
-   Create and activate a virtual environment:
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-   Install dependencies:
-   ```bash
-   pip install fastapi uvicorn sentence-transformers torch numpy
-   ```
-3. **Run the Server**:
-   ```bash
-   uvicorn local_embedding_server:app --host 127.0.0.1 --port 8000
-   ```
-4. **Configure Plugin**:
-   - In Graphene settings, set the **Embedding Provider** to **Local**.
-   - Ensure the URL is set to `http://127.0.0.1:8000`.
+**Popular Ollama embedding models:**
+- `nomic-embed-text` - Good balance of speed and quality (768 dimensions)
+- `mxbai-embed-large` - Higher quality (1024 dimensions)
+- `all-minilm` - Fastest, smaller model (384 dimensions)
+
+### Option 2: OpenAI (Cloud)
+1. Go to **Settings > Graphene**
+2. Select **OpenAI (API key required)** as the embedding provider
+3. Enter your **OpenAI API Key**
+4. Click **Generate all**
 
 ## Usage
 
