@@ -23,83 +23,67 @@ export class CombinedSettingTab extends PluginSettingTab {
 
     display(): void {
         const { containerEl } = this;
-
-        // new Setting(containerEl)
-        //     .setName('Pinecone API Key')
-        //     .setDesc('Optional: For cloud storage of embeddings')
-        //     .addText(text => text
-        //         .setPlaceholder('Your Pinecone API key')
-        //         .setValue(this.plugin.settings.pineconeApiKey)
-        //         .onChange(async (value) => {
-        //             this.plugin.settings.pineconeApiKey = value;
-        //             await this.plugin.saveSettings();
-        //         }));
-
-        // new Setting(containerEl)
-        //     .setName('Pinecone Environment')
-        //     .setDesc('Your Pinecone environment (e.g., us-west1-gcp)')
-        //     .addText(text => text
-        //         .setPlaceholder('us-west1-gcp')
-        //         .setValue(this.plugin.settings.pineconeEnvironment)
-        //         .onChange(async (value) => {
-        //             this.plugin.settings.pineconeEnvironment = value;
-        //             await this.plugin.saveSettings();
-        //         }));
-
-        // new Setting(containerEl)
-        //     .setName('Pinecone Index Name')
-        //     .setDesc('Your Pinecone index name')
-        //     .addText(text => text
-        //         .setPlaceholder('obsidian-notes')
-        //         .setValue(this.plugin.settings.pineconeIndexName)
-        //         .onChange(async (value) => {
-        //             this.plugin.settings.pineconeIndexName = value;
-        //             await this.plugin.saveSettings();
-        //         }));
+        containerEl.empty();
 
         // Embedding Settings Section
         new Setting(containerEl).setName("Embedding settings").setHeading();
 
-        // Provider selector: OpenAI vs Local
+        // Provider selector: OpenAI vs Ollama
 
         new Setting(containerEl)
             .setName('Embedding provider')
             .setDesc('Choose how embeddings are generated')
             .addDropdown(drop => {
-                drop.addOption('openai', 'OpenAI');
-                drop.addOption('local', 'Local (sentence-transformers)');
-                const current = this.plugin.settings.useLocalEmbeddings ? 'local' : 'openai';
-                drop.setValue(current);
+                drop.addOption('ollama', 'Ollama (local)');
+                drop.addOption('openai', 'OpenAI (API key required)');
+                drop.setValue(this.plugin.settings.embeddingProvider || 'ollama');
                 drop.onChange(async (value) => {
-                    const useLocal = value === 'local';
-                    this.plugin.settings.useLocalEmbeddings = useLocal;
+                    this.plugin.settings.embeddingProvider = value as 'openai' | 'ollama';
                     await this.plugin.saveSettings();
-                    new Notice(`Embedding provider set to ${useLocal ? 'Local' : 'OpenAI'}`);
+                    new Notice(`Embedding provider set to ${value === 'ollama' ? 'Ollama' : 'OpenAI'}`);
+                    // Refresh the settings display to show/hide relevant options
+                    this.display();
                 });
             });
-        
-        new Setting(containerEl)
-            .setName('OpenAI API key')
-            .setDesc('Required for generating semantic embeddings and AI summaries')
-            .addText(text => text
-                .setPlaceholder('sk-...')
-                .setValue(this.plugin.settings.openaiApiKey)
-                .onChange(async (value) => {
-                    this.plugin.settings.openaiApiKey = value;
-                    await this.plugin.saveSettings();
-                }));
 
-        // Local endpoint configuration
-        new Setting(containerEl)
-            .setName('Local embedding endpoint')
-            .setDesc('HTTP endpoint for local embedding server (POST /embed)')
-            .addText(text => text
-                .setPlaceholder('http://127.0.0.1:8000/embed')
-                .setValue(this.plugin.settings.localEmbeddingEndpoint || 'http://127.0.0.1:8000/embed')
-                .onChange(async (value) => {
-                    this.plugin.settings.localEmbeddingEndpoint = value;
-                    await this.plugin.saveSettings();
-                }));
+        // Ollama settings (shown when Ollama is selected)
+        if (this.plugin.settings.embeddingProvider === 'ollama' || !this.plugin.settings.embeddingProvider) {
+            new Setting(containerEl)
+                .setName('Ollama endpoint')
+                .setDesc('URL where Ollama is running')
+                .addText(text => text
+                    .setPlaceholder('http://localhost:11434')
+                    .setValue(this.plugin.settings.ollamaEndpoint || 'http://localhost:11434')
+                    .onChange(async (value) => {
+                        this.plugin.settings.ollamaEndpoint = value;
+                        await this.plugin.saveSettings();
+                    }));
+
+            new Setting(containerEl)
+                .setName('Ollama model')
+                .setDesc('Embedding model to use (e.g., nomic-embed-text, mxbai-embed-large)')
+                .addText(text => text
+                    .setPlaceholder('nomic-embed-text')
+                    .setValue(this.plugin.settings.ollamaModel || 'nomic-embed-text')
+                    .onChange(async (value) => {
+                        this.plugin.settings.ollamaModel = value;
+                        await this.plugin.saveSettings();
+                    }));
+        }
+
+        // OpenAI settings (shown when OpenAI is selected)
+        if (this.plugin.settings.embeddingProvider === 'openai') {
+            new Setting(containerEl)
+                .setName('OpenAI API key')
+                .setDesc('Required for generating semantic embeddings')
+                .addText(text => text
+                    .setPlaceholder('sk-...')
+                    .setValue(this.plugin.settings.openaiApiKey)
+                    .onChange(async (value) => {
+                        this.plugin.settings.openaiApiKey = value;
+                        await this.plugin.saveSettings();
+                    }));
+        }
 
         // Max similarity links per node
         new Setting(containerEl)
@@ -149,7 +133,7 @@ export class CombinedSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName('Exclude headings from embedding')
-            .setDesc('If enabled, markdown headings are not included in embedding text (reduces format-based similarity)')
+            .setDesc('If enabled, markdown headings are not included in embedding text (reduces format-based similarity).')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.excludeHeadingsFromEmbedding ?? true)
                 .onChange(async (value) => {
@@ -449,18 +433,14 @@ export class CombinedSettingTab extends PluginSettingTab {
 
         // Add a "Clear cache" button for troubleshooting
         new Setting(containerEl)
-            .setName('Clear embedding cache')
-            .setDesc('Remove all cached embeddings (use if experiencing issues)')
+            .setName('Clear all embeddings')
+            .setDesc('Remove all cached embeddings from both cache and storage (use if experiencing issues)')
             .addButton(button => button
-                .setButtonText('Clear cache')
+                .setButtonText('Clear all')
                 .setWarning()
                 .onClick(async () => {
-                    // Use a custom modal or just proceed without confirm for now to satisfy linter
-                    // Ideally use Obsidian's Modal API, but for quick fix removing confirm or assuming yes
-                    // Or better: just do it.
-                    await this.plugin.embeddingService.clearCache();
+                    await this.plugin.clearAllEmbeddings();
                     this.plugin.updateEmbeddingStatusUI();
-                    new Notice('Embedding cache cleared');
                 }));
 
         new Setting(containerEl)

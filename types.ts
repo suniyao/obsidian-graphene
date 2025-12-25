@@ -17,10 +17,11 @@ export interface BetterGraphSettings {
     excludeHeadingsFromEmbedding?: boolean; // if true, don't include markdown headings in embedding text
     maxSimilarLinksPerNode?: number; // cap number of similarity links originating from a node
     dynamicSimilarityPruning?: boolean; // use per-node distribution to prune weak links
-    // Local embedding (optional)
-    useLocalEmbeddings?: boolean;
-    localEmbeddingEndpoint?: string;
-    localModelName?: string;
+    // Embedding provider: 'openai' | 'ollama'
+    embeddingProvider?: 'openai' | 'ollama';
+    // Ollama settings
+    ollamaEndpoint?: string;
+    ollamaModel?: string;
     
     // Graph Display
     nodeSize: number;
@@ -61,10 +62,10 @@ export const DEFAULT_SETTINGS: BetterGraphSettings = {
     excludeHeadingsFromEmbedding: true,
     maxSimilarLinksPerNode: 10,
     dynamicSimilarityPruning: true,
-    // Local embedding defaults
-    useLocalEmbeddings: true,
-    localEmbeddingEndpoint: 'http://127.0.0.1:8000/embed',
-    localModelName: 'thenlper/gte-large',
+    // Embedding provider defaults
+    embeddingProvider: 'ollama',
+    ollamaEndpoint: 'http://localhost:11434',
+    ollamaModel: 'nomic-embed-text',
     
     // Graph Display - Updated physics values
     nodeSize: 6,

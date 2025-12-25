@@ -144,6 +144,27 @@ export default class CombinedPlugin extends Plugin {
         }
     }
 
+    /**
+     * Clear all embedding data from both embedding-cache.json and data.json
+     */
+    public async clearAllEmbeddings(): Promise<void> {
+        try {
+            // Clear the embedding cache
+            await this.embeddingService.clearCache();
+            
+            // Clear embeddings from data.json
+            const data = await this.loadData() || {};
+            data.embeddings = {};
+            data.embeddingMetadata = {};
+            await this.saveData(data);
+            
+            new Notice('All embeddings cleared');
+        } catch (e) {
+            console.error('Failed to clear embeddings:', e);
+            new Notice('Failed to clear embeddings; see console');
+        }
+    }
+
     // Update the updateEmbeddingStatusUI method:
 
     // ...existing code...
@@ -160,7 +181,7 @@ updateEmbeddingStatusUI(): void {
     const statusContainer = this.embeddingStatusEl.createDiv('embedding-status-container');
     
     // Header
-    statusContainer.createEl('h4', { text: 'Embedding Status' });
+    statusContainer.createEl('h4', { text: 'Embedding status' });
     
     // Progress bar container
     const progressContainer = statusContainer.createDiv('embedding-progress-container');
@@ -211,7 +232,7 @@ updateEmbeddingStatusUI(): void {
     // Update button if needed
     if (stats.modified + stats.new > 0) {
         const updateButton = statusContainer.createEl('button', {
-            text: 'Update Embeddings',
+            text: 'Update embeddings',
             cls: 'mod-cta embedding-update-button'
         });
         
@@ -252,8 +273,10 @@ updateEmbeddingStatusUI(): void {
     }
 
     async generateEmbeddingsForAllNotes(): Promise<void> {
-        if (!this.settings.openaiApiKey) {
-            new Notice('Please configure OpenAI API key in settings first');
+        // Check provider configuration
+        const provider = this.settings.embeddingProvider || 'ollama';
+        if (provider === 'openai' && !this.settings.openaiApiKey) {
+            new Notice('Please configure OpenAI API key in settings first.');
             return;
         }
 
