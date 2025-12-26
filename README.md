@@ -1,15 +1,20 @@
 # Graphene
-### A Semantic Graph View for Obsidian Based on Content Similarity Using Vector Embeddings
-<p align="center"><img width="406" height="422" alt="image" src="https://github.com/user-attachments/assets/035d31ba-1ab3-473b-8f91-8ee66679495b" /> <img width="409" height="422" alt="image" src="https://github.com/user-attachments/assets/3faf76b4-e81c-4551-8bec-398256a83b5c" /> </p>
-Graphene transforms your Obsidian vault into an interactive, semantic knowledge graph. Unlike the standard graph view which only shows explicit links, Graphene uses vector embeddings to discover and visualize hidden connections between your notes based on their content similarity.
+
+> A Semantic Graph View for Obsidian Based on Content Similarity Using Vector Embeddings
+
+<p align="center">
+  <img width="406" height="422" alt="Graphene semantic view" src="https://github.com/user-attachments/assets/035d31ba-1ab3-473b-8f91-8ee66679495b" />
+  <img width="409" height="422" alt="Graphene graph controls" src="https://github.com/user-attachments/assets/3faf76b4-e81c-4551-8bec-398256a83b5c" />
+</p>
+
+Graphene transforms your Obsidian vault into an interactive, semantic knowledge graph. Unlike the standard graph view which only shows explicit links, Graphene uses vector embeddings to discover and visualize **hidden connections** between your notes based on their content similarity.
 
 ## Key Features
-
 
 - **Semantic Connections**: Visualizes content similarity as dotted lines, revealing relationships you didn't explicitly link.
 - **Hybrid Visualization**: Combines standard wikilinks (solid lines) with semantic similarity (dotted lines) in a single view.
 - **Interactive Physics**: Powered by D3.js, featuring a responsive force-directed layout you can tweak in real-time.
-- **Smart Embeddings**: Optimizes token usage by embedding only headings and key content, saving costs and processing time.
+- **Smart Embeddings**: Optimizes token usage by choosing processed word limit and initial word skipping, saving costs and processing time.
 - **Granular Control**:
   - Adjust connection thresholds.
   - Customize physics (repulsion, link distance, center force).
@@ -19,7 +24,8 @@ Graphene transforms your Obsidian vault into an interactive, semantic knowledge 
 ## Installation
 
 ### Manual Installation
-1. Download the latest release from the GitHub releases page.
+
+1. Download the latest release from the [GitHub releases page](https://github.com/suniyao/obsidian-graphene/releases).
 2. Extract the `graphene` folder into your vault's `.obsidian/plugins/` directory.
 3. Reload Obsidian and enable **Graphene** in Community Plugins.
 
@@ -69,21 +75,35 @@ The control panel on the right allows you to customize the graph:
 - **Reset**: Restore default settings with a single click.
 
 ### Generating Embeddings
+
 - Go to the plugin settings to see the **Embedding Status**.
 - It tracks which files are new, modified, or up-to-date.
 - Click **Update Embeddings** to process only the changed files.
 
+**Tips:**
+- If you have a fixed style of notes (e.g., meeting notes), consider using the **Skip Initial Words** and **Exclude Headings** settings to prevent correlation based on template similarity.
+- If you have a large vault, adjust the **Word Limit for Embeddings** to reduce token usage and speed up embedding generation.
+
+> **Troubleshooting**: To clear all embeddings when encountering issues, use the **Clear All Embeddings** button in settings.
+
 ## Development
 
-1. Clone the repository.
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Start development build:
-   ```bash
-   npm run dev
-   ```
+```bash
+# Clone the repository
+git clone https://github.com/suniyao/obsidian-graphene.git
+
+# Install dependencies
+npm install
+
+# Start development build
+npm run build
+
+# With Hot Reload
+npm run dev
+```
+
+For hot reloading during development, install [Hot Reload](https://github.com/pjeby/hot-reload).
 
 ## License
-GPL-3.0 license
+
+[GPL-3.0](LICENSE)
