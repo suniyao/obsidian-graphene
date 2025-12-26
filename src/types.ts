@@ -73,7 +73,7 @@ export const DEFAULT_SETTINGS: BetterGraphSettings = {
     showArrows: false,     // Added default
     showParticleAnimation: true, // Added default
     
-    textFadeThreshold: 1.2, // Added default
+    textFadeThreshold: 0, // Normalized: -1 to 1, where 0 = 1.5 actual zoom level
     nodeSize: 6,
     defaultLinkThickness: 0.5,
     dottedLinkThickness: 1.25,

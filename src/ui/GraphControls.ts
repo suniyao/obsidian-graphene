@@ -38,9 +38,9 @@ export class GraphControls {
                 if (this.view.renderer) this.view.renderer.toggleParticleAnimation(enabled);
             });
 
-            // Text fade threshold
-            this.createSlider(content, 'Text fade threshold', 0.2, 2.0, 0.1, 
-                this.plugin.settings.textFadeThreshold || 0.7, (value) => {
+            // Text fade threshold (normalized: -3 to 3, where 0 = 1.5 actual zoom level)
+            this.createSlider(content, 'Text fade threshold', -3, 3, 0.1, 
+                this.plugin.settings.textFadeThreshold ?? 0, (value) => {
                 this.plugin.settings.textFadeThreshold = value;
                 if (this.view.renderer) this.view.renderer.setTextFadeThreshold(value);
             }, async (value) => {

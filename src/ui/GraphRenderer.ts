@@ -344,15 +344,18 @@ export class GraphRenderer {
         // Check current zoom level for smooth fade behavior
         const svgNode = this.svg.node();
         const currentZoom = svgNode ? d3.zoomTransform(svgNode).k : 1;
-        const fadeThreshold = this.plugin.settings.textFadeThreshold || 0.7;
-        const fadeStart = fadeThreshold * 0.43; // Start at 43% of threshold value
+        // Convert normalized threshold (-3 to 3) to actual zoom level
+        const normalizedThreshold = this.plugin.settings.textFadeThreshold ?? 0;
+        const fadeThreshold = 1.5 + normalizedThreshold;
+        const fadeStart = fadeThreshold * 0.43;
+        const fadeEnd = fadeThreshold * 1.5;
         
         // Calculate base opacity from zoom level
         let baseOpacity = 0;
-        if (currentZoom >= fadeThreshold) {
+        if (currentZoom >= fadeEnd) {
             baseOpacity = 1;
         } else if (currentZoom > fadeStart) {
-            baseOpacity = (currentZoom - fadeStart) / (fadeThreshold - fadeStart);
+            baseOpacity = (currentZoom - fadeStart) / (fadeEnd - fadeStart);
         }
         
         this.nodeElements.selectAll('foreignObject')
@@ -418,13 +421,16 @@ export class GraphRenderer {
                 // Check current zoom level for smooth fade when resetting
                 const svgNode = this.svg.node();
                 const currentZoom = svgNode ? d3.zoomTransform(svgNode).k : 1;
-                const fadeThreshold = this.plugin.settings.textFadeThreshold || 0.7;
-                const fadeStart = fadeThreshold * 0.43; // Start at 43% of threshold value
+                // Convert normalized threshold (-3 to 3) to actual zoom level
+                const normalizedThreshold = this.plugin.settings.textFadeThreshold ?? 0;
+                const fadeThreshold = 1.5 + normalizedThreshold;
+                const fadeStart = fadeThreshold * 0.43;
+                const fadeEnd = fadeThreshold * 1.5;
                 
-                if (currentZoom >= fadeThreshold) {
+                if (currentZoom >= fadeEnd) {
                     return 1;
                 } else if (currentZoom > fadeStart) {
-                    return (currentZoom - fadeStart) / (fadeThreshold - fadeStart);
+                    return (currentZoom - fadeStart) / (fadeEnd - fadeStart);
                 } else {
                     return 0;
                 }
@@ -450,9 +456,12 @@ export class GraphRenderer {
                 
                 // Handle text fading based on zoom level with smooth transition
                 const zoomLevel = event.transform.k;
-                const fadeThreshold = this.plugin.settings.textFadeThreshold || 0.7;
+                // Convert normalized threshold (-3 to 3) to actual zoom level
+                // -3 = -1.5 zoom, 0 = 1.5 zoom, 3 = 4.5 zoom
+                const normalizedThreshold = this.plugin.settings.textFadeThreshold ?? 0;
+                const fadeThreshold = 1.5 + normalizedThreshold; // Maps -3->-1.5, 0->1.5, 3->4.5
                 const fadeStart = fadeThreshold * 0.43; // Start fading in at 43% of threshold value
-                const fadeEnd = fadeThreshold * 1.5; // Full opacity at 180% of threshold (longer fade duration)
+                const fadeEnd = fadeThreshold * 1.5; // Full opacity at 150% of threshold
                 
                 // Calculate opacity based on zoom level
                 let baseOpacity = 0;
@@ -786,18 +795,21 @@ export class GraphRenderer {
             .attr('marker-end', showArrows ? 'url(#arrow)' : null);
     }
 
-    setTextFadeThreshold(threshold: number) {
+    setTextFadeThreshold(normalizedThreshold: number) {
         // Implement smooth text fading based on zoom level
+        // Convert normalized threshold (-3 to 3) to actual zoom level
         const svgNode = this.svg.node();
         if (!svgNode) return;
         const currentZoom = d3.zoomTransform(svgNode).k;
-        const fadeStart = threshold * 0.43; // Start at 43% of threshold value
+        const threshold = 1.5 + normalizedThreshold; // Maps -3->-1.5, 0->1.5, 3->4.5
+        const fadeStart = threshold * 0.43;
+        const fadeEnd = threshold * 1.5;
         
         let opacity = 0;
-        if (currentZoom >= threshold) {
+        if (currentZoom >= fadeEnd) {
             opacity = 1;
         } else if (currentZoom > fadeStart) {
-            opacity = (currentZoom - fadeStart) / (threshold - fadeStart);
+            opacity = (currentZoom - fadeStart) / (fadeEnd - fadeStart);
         }
         
         this.nodeElements.selectAll('foreignObject')
