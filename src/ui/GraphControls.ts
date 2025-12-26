@@ -78,6 +78,16 @@ export class GraphControls {
                 await this.plugin.saveSettings();
             });
 
+            // Dotted link spacing
+            this.createSlider(content, 'Dotted link spacing', 0.1, 2, 0.1, 
+                this.plugin.settings.dottedLinkSpacing ?? 1, (value) => {
+                this.plugin.settings.dottedLinkSpacing = value;
+                if (this.view.renderer) this.view.renderer.updateDottedLinkSpacing(value);
+            }, async (value) => {
+                this.plugin.settings.dottedLinkSpacing = value;
+                await this.plugin.saveSettings();
+            });
+
             // Animate button
             // const animateBtn = content.createEl('button', {
             //     text: 'Animate',

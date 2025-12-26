@@ -733,9 +733,11 @@ export class GraphRenderer {
                 const normalizedSim = Math.max(0, (sim - similarityThreshold) / (1 - similarityThreshold));
                 
                 // Spacing inversely proportional to similarity: higher similarity = tighter spacing
-                // Range: 80px (low sim) to 3px (high sim) for more obvious difference
-                const minSpacing = 3;
-                const maxSpacing = 80;
+                // User setting is normalized (1 = 20px base), scale from base*0.25 (high sim) to base*3 (low sim)
+                const spacingMultiplier = this.plugin.settings.dottedLinkSpacing ?? 1;
+                const baseSpacing = spacingMultiplier * 20; // 1 = 20px
+                const minSpacing = baseSpacing * 0.25;
+                const maxSpacing = baseSpacing * 3;
                 const spacing = maxSpacing - normalizedSim * (maxSpacing - minSpacing);
                 
                 group.select('line.similarity-link')
@@ -852,6 +854,24 @@ updateNodeSize(size: number) {
     updateDottedLinkSize(size: number) {
         this.linkElements.selectAll('line.similarity-link')
             .attr('stroke-width', size * 2);
+    }
+
+    updateDottedLinkSpacing(spacingMultiplier: number) {
+        const similarityThreshold = this.plugin.settings.similarityThreshold;
+        const baseSpacing = spacingMultiplier * 20; // 1 = 20px
+        this.linkElements.each((d, i, nodes) => {
+            const group = d3.select(nodes[i]);
+            const similarity = group.attr('data-similarity');
+            if (similarity) {
+                const sim = parseFloat(similarity);
+                const normalizedSim = Math.max(0, (sim - similarityThreshold) / (1 - similarityThreshold));
+                const minSpacing = baseSpacing * 0.25;
+                const maxSpacing = baseSpacing * 3;
+                const spacing = maxSpacing - normalizedSim * (maxSpacing - minSpacing);
+                group.select('line.similarity-link')
+                    .style('stroke-dasharray', `0 ${spacing}`);
+            }
+        });
     }
 
     updateLinkForce(strength: number) {
