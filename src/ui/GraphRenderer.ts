@@ -225,13 +225,18 @@ export class GraphRenderer {
             const hoverFontSize = baseFontSize * 1.2;
             
             // Create a foreignObject for HTML text wrapping
+            // Store original position for zoom-based counter-scaling
             const fo = group.append('foreignObject')
                 .attr('x', -maxLabelWidth / 2)
                 .attr('y', yOffset)
                 .attr('width', maxLabelWidth)
                 .attr('height', 60) // Enough height for 3-4 lines
                 .attr('class', 'node-label-container')
-                .style('pointer-events', 'none'); // Make entire foreignObject non-interactive
+                .attr('data-orig-x', -maxLabelWidth / 2)
+                .attr('data-orig-y', yOffset)
+                .style('pointer-events', 'none') // Make entire foreignObject non-interactive
+                .style('transform-origin', `${maxLabelWidth / 2}px 0px`) // Center-top origin for scaling
+                .style('transform-box', 'fill-box');
             
             const div = fo.append('xhtml:div')
                 .style('width', '100%')
@@ -439,7 +444,7 @@ export class GraphRenderer {
     private setupZoom() {
         // Zoom is already set up in setupSVG, but let's enhance it
         this.zoom = d3.zoom<SVGSVGElement, unknown>()
-            .scaleExtent([0.1, 4])
+            .scaleExtent([0.1, 10])
             .on('zoom', (event) => {
                 this.g.attr('transform', event.transform);
                 
@@ -459,8 +464,23 @@ export class GraphRenderer {
                     baseOpacity = 0; // Hidden below fadeStart
                 }
                 
+                // Counter-scale text labels so they don't grow/shrink proportionally with zoom
+                // Use a dampened inverse scale: text grows slower when zooming out, shrinks slower when zooming in
+                // This keeps text readable at all zoom levels without becoming overwhelming when zoomed in
+                // const minTextScale = 0.3;  // Don't let text get smaller than 30% when zoomed in
+                // const maxTextScale = 5;  // Don't let text get larger than 250% when zoomed out // not used 
+                const textScale = 1 / Math.pow(zoomLevel, 0.85);
                 this.nodeElements?.selectAll('foreignObject')
-                    .style('opacity', baseOpacity);
+                    .style('opacity', baseOpacity)
+                    .attr('transform', `scale(${textScale})`);
+                
+                // Also scale node circles slightly less aggressively (optional - keeps nodes more visible when zoomed out)
+                // Uncomment if you want nodes to also be counter-scaled
+                //  const minNodeScale = 0.3;
+                // const maxNodeScale = 2.5;
+                // const nodeScale = Math.min(1.5, Math.max(0.5, 1 / 1 / Math.pow(zoomLevel, 0.3)));
+                // this.nodeElements?.selectAll('circle')
+                //     .attr('transform', `scale(${nodeScale})`);
             });
 
         this.svg.call(this.zoom);
@@ -482,7 +502,7 @@ export class GraphRenderer {
 
         // Add zoom behavior
         this.zoom = d3.zoom<SVGSVGElement, unknown>()
-            .scaleExtent([0.1, 4])
+            .scaleExtent([0.1, 10])
             .on('zoom', (event) => {
                 this.g.attr('transform', event.transform);
             });
