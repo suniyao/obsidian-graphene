@@ -1,6 +1,4 @@
-# Graphene
-
-> A Semantic Graph View for Obsidian Based on Content Similarity Using Vector Embeddings
+# Graphene - A Semantic Graph View for Obsidian Based on Content Similarity Using Vector Embeddings
 
 <p align="center">
   <img width="406" height="422" alt="Graphene semantic view" src="https://github.com/user-attachments/assets/035d31ba-1ab3-473b-8f91-8ee66679495b" />
