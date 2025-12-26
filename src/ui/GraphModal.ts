@@ -1,16 +1,16 @@
 import { App, Modal, TFile } from 'obsidian';
 import * as d3 from 'd3';
-import type BetterGraphPlugin from './main';
-import { GraphNode, GraphLink } from './types';
+import type CombinedPlugin from '../main';
+import { GraphNode, GraphLink } from '../types';
 
 export class BetterGraphModal extends Modal {
-    plugin: BetterGraphPlugin;
+    plugin: CombinedPlugin;
     nodes: GraphNode[] = [];
     links: GraphLink[] = [];
     simulation: d3.Simulation<GraphNode, GraphLink>;
     svg: d3.Selection<SVGSVGElement, unknown, null, undefined>;
 
-    constructor(app: App, plugin: BetterGraphPlugin) {
+    constructor(app: App, plugin: CombinedPlugin) {
         super(app);
         this.plugin = plugin;
     }

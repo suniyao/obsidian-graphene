@@ -56,9 +56,9 @@ export const DEFAULT_SETTINGS: BetterGraphSettings = {
     
     // Embedding Settings
     useEmbeddings: true,
-    similarityThreshold: 0.8,
+    similarityThreshold: 0.6,
     embeddingWordLimit: 100,
-    embeddingWordSkip: 10,
+    embeddingWordSkip: 20,
     excludeHeadingsFromEmbedding: true,
     maxSimilarLinksPerNode: 10,
     dynamicSimilarityPruning: true,
@@ -68,28 +68,33 @@ export const DEFAULT_SETTINGS: BetterGraphSettings = {
     ollamaModel: 'nomic-embed-text',
     
     // Graph Display - Updated physics values
-    nodeSize: 6,
-    linkDistance: 100,      // Reduced from 100
-    repulsionForce: 100,   // Increased from 300
-    centerForce: 0.8,      // Reduced from 0.3
-    linkForce: 0.05,        // Added default
+    showTags: false,       // Added default
     showArrows: false,     // Added default
-    textFadeThreshold: 0.5, // Added default
     showParticleAnimation: true, // Added default
     
-    // Filters
-    showTags: false,       // Added default
-    showAttachments: false, // Added default
-    existingFilesOnly: true, // Added default
-    showOrphans: true,     // Added default
+    textFadeThreshold: 1.2, // Added default
+    nodeSize: 6,
+    defaultLinkThickness: 0.5,
+    dottedLinkThickness: 1.25,
+    
+    // forces
+    centerForce: 0.7,     
+    repulsionForce: 100,  
+    linkForce: 0.05,        // Added default
+    linkDistance: 100,    
 
+    
     // Link Appearance
-    defaultLinkThickness: 1,
     minLinkThickness: 0.5,
     maxLinkThickness: 8,
     linkThickness: {},
-    dottedLinkThickness: 1.5,
+    
+    // legacy
+    showAttachments: false, // Added default
+    existingFilesOnly: true, // Added default
+    showOrphans: true,     // Added default
 };
+
 
 export interface GraphNode extends d3.SimulationNodeDatum {
     id: string;

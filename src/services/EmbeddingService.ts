@@ -1,5 +1,5 @@
 import { Notice, TFile, App, requestUrl, normalizePath } from 'obsidian';
-import { BetterGraphSettings, FileEmbeddingStatus, EmbeddingCache } from './types';
+import { BetterGraphSettings, FileEmbeddingStatus, EmbeddingCache } from '../types';
 
 export class EmbeddingService {
     private openaiApiKey: string;
