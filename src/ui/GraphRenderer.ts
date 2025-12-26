@@ -452,35 +452,24 @@ export class GraphRenderer {
                 const zoomLevel = event.transform.k;
                 const fadeThreshold = this.plugin.settings.textFadeThreshold || 0.7;
                 const fadeStart = fadeThreshold * 0.43; // Start fading in at 43% of threshold value
+                const fadeEnd = fadeThreshold * 1.5; // Full opacity at 180% of threshold (longer fade duration)
                 
                 // Calculate opacity based on zoom level
                 let baseOpacity = 0;
-                if (zoomLevel >= fadeThreshold) {
-                    baseOpacity = 1; // Full opacity above threshold
+                if (zoomLevel >= fadeEnd) {
+                    baseOpacity = 1; // Full opacity above fadeEnd
                 } else if (zoomLevel > fadeStart) {
-                    // Gradual fade between fadeStart and fadeThreshold
-                    baseOpacity = (zoomLevel - fadeStart) / (fadeThreshold - fadeStart);
+                    // Gradual fade between fadeStart and fadeEnd (longer range)
+                    baseOpacity = (zoomLevel - fadeStart) / (fadeEnd - fadeStart);
                 } else {
                     baseOpacity = 0; // Hidden below fadeStart
                 }
                 
                 // Counter-scale text labels so they don't grow/shrink proportionally with zoom
-                // Use a dampened inverse scale: text grows slower when zooming out, shrinks slower when zooming in
-                // This keeps text readable at all zoom levels without becoming overwhelming when zoomed in
-                // const minTextScale = 0.3;  // Don't let text get smaller than 30% when zoomed in
-                // const maxTextScale = 5;  // Don't let text get larger than 250% when zoomed out // not used 
                 const textScale = 1 / Math.pow(zoomLevel, 0.85);
                 this.nodeElements?.selectAll('foreignObject')
                     .style('opacity', baseOpacity)
                     .attr('transform', `scale(${textScale})`);
-                
-                // Also scale node circles slightly less aggressively (optional - keeps nodes more visible when zoomed out)
-                // Uncomment if you want nodes to also be counter-scaled
-                //  const minNodeScale = 0.3;
-                // const maxNodeScale = 2.5;
-                // const nodeScale = Math.min(1.5, Math.max(0.5, 1 / 1 / Math.pow(zoomLevel, 0.3)));
-                // this.nodeElements?.selectAll('circle')
-                //     .attr('transform', `scale(${nodeScale})`);
             });
 
         this.svg.call(this.zoom);
