@@ -157,8 +157,8 @@ export class GraphControls {
         const content = section.createDiv('section-content');
         content.addClass('is-hidden');
         
-        // Filters starts expanded
-        if (title === 'Filters') {
+        // Display starts expanded by default
+        if (title === 'Display') {
             content.removeClass('is-hidden');
             content.addClass('is-visible');
             setIcon(chevron, 'chevron-down');

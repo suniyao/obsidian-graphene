@@ -382,6 +382,23 @@ updateEmbeddingStatusUI(): void {
         }
     }
 
+    async resetGraphSettings() {
+        // Reset only graph-related settings to defaults
+        this.settings.showTags = COMBINED_DEFAULT_SETTINGS.showTags;
+        this.settings.showArrows = COMBINED_DEFAULT_SETTINGS.showArrows;
+        this.settings.showParticleAnimation = COMBINED_DEFAULT_SETTINGS.showParticleAnimation;
+        this.settings.textFadeThreshold = COMBINED_DEFAULT_SETTINGS.textFadeThreshold;
+        this.settings.nodeSize = COMBINED_DEFAULT_SETTINGS.nodeSize;
+        this.settings.defaultLinkThickness = COMBINED_DEFAULT_SETTINGS.defaultLinkThickness;
+        this.settings.dottedLinkThickness = COMBINED_DEFAULT_SETTINGS.dottedLinkThickness;
+        this.settings.dottedLinkSpacing = COMBINED_DEFAULT_SETTINGS.dottedLinkSpacing;
+        this.settings.centerForce = COMBINED_DEFAULT_SETTINGS.centerForce;
+        this.settings.repulsionForce = COMBINED_DEFAULT_SETTINGS.repulsionForce;
+        this.settings.linkForce = COMBINED_DEFAULT_SETTINGS.linkForce;
+        this.settings.linkDistance = COMBINED_DEFAULT_SETTINGS.linkDistance;
+        await this.saveSettings();
+    }
+
     onunload() {
         // this.app.workspace.detachLeavesOfType(VIEW_TYPE_GRAPH);
     }

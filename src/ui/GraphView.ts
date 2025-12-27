@@ -87,6 +87,19 @@ export class BetterGraphView extends ItemView {
 
         const resetButton = actionsContainer.createDiv('graph-control-close');
         setIcon(resetButton, 'reset');
+        resetButton.addEventListener('click', async () => {
+            // Reset all graph settings to defaults
+            await this.plugin.resetGraphSettings();
+            // Re-render controls to reflect default values
+            this.controls = new GraphControls(controlsContent, this.plugin, this);
+            // Refresh the graph with new settings
+            if (this.renderer) {
+                this.renderer.updateForces();
+                this.renderer.updateNodeSize(this.plugin.settings.nodeSize);
+                this.renderer.updateLinkThickness(this.plugin.settings.defaultLinkThickness);
+            }
+        });
+        
         const closeX = actionsContainer.createDiv('graph-control-close');
         setIcon(closeX, 'x');
         

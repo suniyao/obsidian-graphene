@@ -259,7 +259,9 @@
 }
 
 .node circle {
-    transition: all 0.2s ease;
+    transition: fill 0.2s ease, stroke 0.2s ease;
+    transform-box: fill-box;
+    transform-origin: center;
 }
 
 .node-label {

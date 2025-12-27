@@ -479,6 +479,11 @@ export class GraphRenderer {
                 this.nodeElements?.selectAll('foreignObject')
                     .style('opacity', baseOpacity)
                     .attr('transform', `scale(${textScale})`);
+                
+                // Counter-scale nodes so they stay a consistent visual size
+                const nodeScale =1/ Math.pow(zoomLevel, 0.2);
+                this.nodeElements?.selectAll('circle')
+                    .style('transform', `scale(${nodeScale})`);
             });
 
         this.svg.call(this.zoom);
@@ -719,21 +724,13 @@ export class GraphRenderer {
             const edgePair = `${sourceId}|${targetId}`;
             const highlight = this.highlightedEdges.has(edgePair);
             
-            // Update solid lines
+            // Update solid lines - connect center to center since nodes are CSS-scaled
             const dx = target.x! - source.x!;
             const dy = target.y! - source.y!;
-            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-            const rSource = getNodeRadius(source);
-            const rTarget = getNodeRadius(target);
-            const arrowPad = showArrows ? 6 : 0; // back off a bit more for arrowhead visibility
-            const totalBackoff = Math.min(dist / 2, rSource);
-            const totalForeoff = Math.min(dist / 2, rTarget); // + arrowpad? 
-            const ux = dx / dist;
-            const uy = dy / dist;
-            const x1 = source.x! + ux * totalBackoff;
-            const y1 = source.y! + uy * totalBackoff;
-            const x2 = target.x! - ux * totalForeoff;
-            const y2 = target.y! - uy * totalForeoff;
+            const x1 = source.x!;
+            const y1 = source.y!;
+            const x2 = target.x!;
+            const y2 = target.y!;
 
             group.select('line.solid-link')
                 .attr('x1', x1)
