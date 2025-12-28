@@ -24,8 +24,8 @@ export class GraphRenderer {
     private getNodeRadius(node: GraphNode): number {
         if (node.type === 'tag' && node.connectionCount) {
             const minSize = this.plugin.settings.nodeSize * 0.8;
-            const maxSize = this.plugin.settings.nodeSize * 2;
-            const scaleFactor = Math.log(node.connectionCount + 1) / Math.log(10);
+            const maxSize = this.plugin.settings.nodeSize * 4;
+            const scaleFactor = (node.connectionCount + 1)/ 10;
             return Math.min(maxSize, minSize + scaleFactor * 10);
         }
         return this.plugin.settings.nodeSize;
@@ -681,10 +681,9 @@ export class GraphRenderer {
             })
             .on('end', (event, d) => {
                 if (!event.active) this.simulation.alphaTarget(0);
-                // Keep the node fixed after dragging
-                // Remove these lines if you want nodes to be free after dragging
-                // d.fx = null;
-                // d.fy = null;
+                // Release the node after dragging so it's affected by forces again
+                d.fx = null;
+                d.fy = null;
             });
     }
 
