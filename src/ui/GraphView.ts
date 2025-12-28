@@ -58,36 +58,57 @@ export class BetterGraphView extends ItemView {
         
         // Create control panel container
         const controlPanelContainer = mainContainer.createDiv('graph-control-panel');
-        controlPanelContainer.addClass('is-hidden');
+        controlPanelContainer.style.display = 'none'; // Start hidden
+        controlPanelContainer.style.width = '240px'; // Set width here (default was 240px in CSS)
         
         // Create control toggle button
         const controlToggle = mainContainer.createDiv('graph-control-toggle');
         setIcon(controlToggle, 'settings');
         
-        // Toggle control panel
-        controlToggle.addEventListener('click', () => {
-            const isHidden = controlPanelContainer.hasClass('is-hidden');
-            if (isHidden) {
-                controlPanelContainer.removeClass('is-hidden');
-                controlToggle.addClass('is-hidden');
+        // Handle hover state in JS to ensure opacity works correctly
+        controlToggle.onmouseenter = () => {
+            controlToggle.style.background = 'linear-gradient(var(--background-modifier-hover), var(--background-modifier-hover)), var(--background-primary)';
+            controlToggle.style.color = 'var(--text-normal)';
+        };
+        
+        controlToggle.onmouseleave = () => {
+            controlToggle.style.background = 'var(--background-primary)';
+            controlToggle.style.color = 'var(--text-muted)';
+        };
+        
+        // Helper to toggle visibility
+        const togglePanel = (show: boolean) => {
+            if (show) {
+                controlPanelContainer.style.display = 'flex';
+                controlToggle.style.display = 'none';
             } else {
-                controlPanelContainer.addClass('is-hidden');
-                controlToggle.removeClass('is-hidden');
+                controlPanelContainer.style.display = 'none';
+                controlToggle.style.display = 'flex';
             }
-        });
+        };
+
+        // Toggle control panel
+        controlToggle.onclick = (e) => {
+            e.stopPropagation();
+            togglePanel(true);
+        };
         
         // Create close button inside panel
         const controlHeader = controlPanelContainer.createDiv('graph-control-header');
         const filterTitle = controlHeader.createDiv('graph-control-title');
-        // setIcon(filterTitle, 'chevron-down');
         filterTitle.createSpan({ text: 'Settings' });
         
         const actionsContainer = controlHeader.createDiv('graph-control-actions');
-        actionsContainer.addClass('flex-row-gap-4');
+        // Force flex layout via inline styles to ensure it works
+        actionsContainer.style.display = 'flex';
+        actionsContainer.style.flexDirection = 'row';
+        actionsContainer.style.alignItems = 'center';
+        actionsContainer.style.gap = '4px';
 
         const resetButton = actionsContainer.createDiv('graph-control-close');
         setIcon(resetButton, 'reset');
-        resetButton.addEventListener('click', async () => {
+        resetButton.onclick = async (e) => {
+            e.stopPropagation();
             // Reset all graph settings to defaults
             await this.plugin.resetGraphSettings();
             // Re-render controls to reflect default values
@@ -98,15 +119,15 @@ export class BetterGraphView extends ItemView {
                 this.renderer.updateNodeSize(this.plugin.settings.nodeSize);
                 this.renderer.updateLinkThickness(this.plugin.settings.defaultLinkThickness);
             }
-        });
+        };
         
         const closeX = actionsContainer.createDiv('graph-control-close');
         setIcon(closeX, 'x');
         
-        closeX.addEventListener('click', () => {
-            controlPanelContainer.addClass('is-hidden');
-            controlToggle.removeClass('is-hidden');
-        });
+        closeX.onclick = (e) => {
+            e.stopPropagation();
+            togglePanel(false);
+        };
         
         // Create controls content
         const controlsContent = controlPanelContainer.createDiv('graph-controls-content');

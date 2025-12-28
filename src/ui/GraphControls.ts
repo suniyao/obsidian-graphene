@@ -150,32 +150,33 @@ export class GraphControls {
         const header = section.createDiv('section-header');
         
         const chevron = header.createDiv('section-chevron');
-        setIcon(chevron, 'chevron-right');
+        setIcon(chevron, 'chevron-down');
         
         header.createSpan({ text: title, cls: 'section-title' });
         
         const content = section.createDiv('section-content');
-        content.addClass('is-hidden');
         
-        // Display starts expanded by default
-        if (title === 'Display') {
-            content.removeClass('is-hidden');
-            content.addClass('is-visible');
-            setIcon(chevron, 'chevron-down');
-        }
-        
-        header.addEventListener('click', () => {
-            const isOpen = content.hasClass('is-visible');
-            if (isOpen) {
-                content.removeClass('is-visible');
-                content.addClass('is-hidden');
-                setIcon(chevron, 'chevron-right');
-            } else {
-                content.removeClass('is-hidden');
-                content.addClass('is-visible');
+        // Helper to toggle state
+        const toggleSection = (open: boolean) => {
+            if (open) {
+                content.style.display = 'block';
                 setIcon(chevron, 'chevron-down');
+            } else {
+                content.style.display = 'none';
+                setIcon(chevron, 'chevron-right');
             }
-        });
+        };
+
+        // Default state
+        const startOpen = title === 'Display';
+        toggleSection(startOpen);
+        
+        // Use onclick to ensure it works
+        header.onclick = (e) => {
+            e.stopPropagation(); // Prevent bubbling issues
+            const isHidden = content.style.display === 'none';
+            toggleSection(isHidden);
+        };
         
         buildContent(content);
     }
@@ -197,6 +198,12 @@ export class GraphControls {
     private createSlider(parent: HTMLElement, label: string, min: number, max: number, step: number, 
         value: number, onInput: (value: number) => void, onChange?: (value: number) => void) {
         const container = parent.createDiv('slider-container');
+        // Force full width layout via inline styles
+        container.style.width = '100%';
+        container.style.display = 'flex';
+        container.style.flexDirection = 'column';
+        container.style.marginBottom = '12px';
+
         container.createEl('span', { text: label, cls: 'slider-label' });
         
         const slider = new SliderComponent(container)
@@ -206,6 +213,10 @@ export class GraphControls {
         
         slider.sliderEl.addClass('slider');
         slider.sliderEl.addClass('w-full');
+        
+        // Force slider width
+        slider.sliderEl.style.width = '100%';
+        slider.sliderEl.style.display = 'block';
 
         // Handle real-time updates (dragging)
         slider.sliderEl.addEventListener('input', () => {
