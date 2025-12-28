@@ -144,7 +144,11 @@ export class GraphRenderer {
         this.linkElements = linksGroup.selectAll<SVGGElement, GraphLink>('g.link-group')
             .data(this.links)
             .join('g')
-            .attr('class', d => `link-group ${d.type || 'normal'}`);
+            .attr('class', d => `link-group ${d.type || 'normal'}`)
+            .attr('opacity', d => {
+                if (d.type === 'tag-link' && !this.plugin.settings.showTags) return 0;
+                return 1;
+            });
         
         // Add either solid lines or prepare for dotted lines
         const showArrows = this.showArrows;
@@ -182,6 +186,14 @@ export class GraphRenderer {
         .data(this.nodes)
         .join('g')
         .attr('class', d => `node ${d.type || 'file'}`)
+        .attr('opacity', d => {
+            if (d.type === 'tag' && !this.plugin.settings.showTags) return 0;
+            return 1;
+        })
+        .style('pointer-events', d => {
+            if (d.type === 'tag' && !this.plugin.settings.showTags) return 'none';
+            return null;
+        })
         .call(this.drag());
 
     // Add circles with size based on connections for tags
@@ -204,8 +216,6 @@ export class GraphRenderer {
         })
         .attr('stroke', 'none')
         .attr('stroke-width', 0)
-        .attr('opacity', 1)
-        .style('pointer-events', 'all') // Ensure only circles are interactive
         .style('cursor', 'pointer');
 
         // Add labels with text wrapping
@@ -554,14 +564,26 @@ export class GraphRenderer {
                     }
                     return this.plugin.settings.linkDistance * 1.2;
                 })
-                .strength(0.1)) // Much weaker link force to allow natural scattering
+                .strength((d) => {
+                    if (!this.plugin.settings.showTags) {
+                        const s = d.source as GraphNode;
+                        const t = d.target as GraphNode;
+                        if (s.type === 'tag' || t.type === 'tag') return 0;
+                    }
+                    return 0.1;
+                })) // Much weaker link force to allow natural scattering
             .force('charge', d3.forceManyBody()
-                .strength(-this.plugin.settings.repulsionForce * 0.8)
+                .strength((d: GraphNode) => {
+                    if (d.type === 'tag' && !this.plugin.settings.showTags) return 0;
+                    return -this.plugin.settings.repulsionForce * 0.8;
+                })
                 .distanceMax(targetRadius * 1.5)) // Scale repulsion distance with target radius
             .force('radial', d3.forceRadial(targetRadius, centerX, centerY)
                 .strength(0.05)) // Gentle radial force to create circular boundary
             .force('collision', d3.forceCollide()
                 .radius((d: GraphNode) => {
+                    if (d.type === 'tag' && !this.plugin.settings.showTags) return 0;
+
                     if (d.type === 'tag' && d.connectionCount) {
                         const minSize = this.plugin.settings.nodeSize * 0.8;
                         const maxSize = this.plugin.settings.nodeSize * 2;
@@ -598,16 +620,27 @@ export class GraphRenderer {
         if (this.simulation) {
             // Update charge force
             (this.simulation.force('charge') as d3.ForceManyBody<GraphNode>)
-                ?.strength(-this.plugin.settings.repulsionForce * 0.8)
+                ?.strength((d: GraphNode) => {
+                    if (d.type === 'tag' && !this.plugin.settings.showTags) return 0;
+                    return -this.plugin.settings.repulsionForce * 0.8;
+                })
                 ?.distanceMax(targetRadius * 1.5);
             
-            // Update link distances
+            // Update link distances and strength
             (this.simulation.force('link') as d3.ForceLink<GraphNode, GraphLink>)
                 ?.distance(d => {
                     if (d.similarity !== undefined) {
                         return this.plugin.settings.linkDistance * (3.0 - 2.8 * d.similarity);
                     }
                     return this.plugin.settings.linkDistance * 1.2;
+                })
+                ?.strength((d) => {
+                    if (!this.plugin.settings.showTags) {
+                        const s = d.source as GraphNode;
+                        const t = d.target as GraphNode;
+                        if (s.type === 'tag' || t.type === 'tag') return 0;
+                    }
+                    return 0.1;
                 });
             
             // Update radial force with new radius - this controls tight vs loose circle
@@ -616,6 +649,20 @@ export class GraphRenderer {
                 ?.x(centerX)
                 ?.y(centerY)
                 ?.strength(0.05);
+
+            // Update collision force
+            (this.simulation.force('collision') as d3.ForceCollide<GraphNode>)
+                ?.radius((d: GraphNode) => {
+                    if (d.type === 'tag' && !this.plugin.settings.showTags) return 0;
+
+                    if (d.type === 'tag' && d.connectionCount) {
+                        const minSize = this.plugin.settings.nodeSize * 0.8;
+                        const maxSize = this.plugin.settings.nodeSize * 2;
+                        const scaleFactor = Math.log(d.connectionCount + 1) / Math.log(10);
+                        return Math.min(maxSize, minSize + scaleFactor * 10) + 4;
+                    }
+                    return this.plugin.settings.nodeSize + 4;
+                });
 
             this.simulation.alpha(0.3).restart();
         }
@@ -783,6 +830,29 @@ export class GraphRenderer {
                 const targetNode = this.nodes.find(n => n.id === target);
                 return (sourceNode?.hidden || targetNode?.hidden) ? 'none' : 'block';
             });
+    }
+
+    toggleTags(showTags: boolean) {
+        // Update node visibility
+        this.nodeElements
+            .attr('opacity', d => {
+                if (d.type === 'tag' && !showTags) return 0;
+                return 1;
+            })
+            .style('pointer-events', d => {
+                if (d.type === 'tag' && !showTags) return 'none';
+                return 'all';
+            });
+
+        // Update link visibility
+        this.linkElements
+            .attr('opacity', d => {
+                if (d.type === 'tag-link' && !showTags) return 0;
+                return 1;
+            });
+
+        // Update forces to ignore hidden tags
+        this.updateForces();
     }
 
     toggleArrows(showArrows: boolean) {

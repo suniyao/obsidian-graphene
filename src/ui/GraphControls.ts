@@ -23,7 +23,7 @@ export class GraphControls {
                 this.plugin.settings.showTags = enabled;
                 this.view.filters.showTags = enabled;
                 await this.plugin.saveSettings();
-                await this.view.refresh();
+                if (this.view.renderer) this.view.renderer.toggleTags(enabled);
             });
             // Arrows
             this.createToggle(content, 'Arrows', this.plugin.settings.showArrows || false, async (enabled) => {
