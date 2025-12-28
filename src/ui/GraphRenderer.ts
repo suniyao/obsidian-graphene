@@ -225,13 +225,18 @@ export class GraphRenderer {
             const hoverFontSize = baseFontSize * 1.2;
             
             // Create a foreignObject for HTML text wrapping
+            // Store original position for zoom-based counter-scaling
             const fo = group.append('foreignObject')
                 .attr('x', -maxLabelWidth / 2)
                 .attr('y', yOffset)
                 .attr('width', maxLabelWidth)
                 .attr('height', 60) // Enough height for 3-4 lines
                 .attr('class', 'node-label-container')
-                .style('pointer-events', 'none'); // Make entire foreignObject non-interactive
+                .attr('data-orig-x', -maxLabelWidth / 2)
+                .attr('data-orig-y', yOffset)
+                .style('pointer-events', 'none') // Make entire foreignObject non-interactive
+                .style('transform-origin', `${maxLabelWidth / 2}px 0px`) // Center-top origin for scaling
+                .style('transform-box', 'fill-box');
             
             const div = fo.append('xhtml:div')
                 .style('width', '100%')
@@ -339,15 +344,18 @@ export class GraphRenderer {
         // Check current zoom level for smooth fade behavior
         const svgNode = this.svg.node();
         const currentZoom = svgNode ? d3.zoomTransform(svgNode).k : 1;
-        const fadeThreshold = this.plugin.settings.textFadeThreshold || 0.7;
-        const fadeStart = fadeThreshold * 0.43; // Start at 43% of threshold value
+        // Convert normalized threshold (-3 to 3) to actual zoom level
+        const normalizedThreshold = this.plugin.settings.textFadeThreshold ?? 0;
+        const fadeThreshold = 1.5 + normalizedThreshold;
+        const fadeStart = fadeThreshold * 0.43;
+        const fadeEnd = fadeThreshold * 1.5;
         
         // Calculate base opacity from zoom level
         let baseOpacity = 0;
-        if (currentZoom >= fadeThreshold) {
+        if (currentZoom >= fadeEnd) {
             baseOpacity = 1;
         } else if (currentZoom > fadeStart) {
-            baseOpacity = (currentZoom - fadeStart) / (fadeThreshold - fadeStart);
+            baseOpacity = (currentZoom - fadeStart) / (fadeEnd - fadeStart);
         }
         
         this.nodeElements.selectAll('foreignObject')
@@ -413,13 +421,16 @@ export class GraphRenderer {
                 // Check current zoom level for smooth fade when resetting
                 const svgNode = this.svg.node();
                 const currentZoom = svgNode ? d3.zoomTransform(svgNode).k : 1;
-                const fadeThreshold = this.plugin.settings.textFadeThreshold || 0.7;
-                const fadeStart = fadeThreshold * 0.43; // Start at 43% of threshold value
+                // Convert normalized threshold (-3 to 3) to actual zoom level
+                const normalizedThreshold = this.plugin.settings.textFadeThreshold ?? 0;
+                const fadeThreshold = 1.5 + normalizedThreshold;
+                const fadeStart = fadeThreshold * 0.43;
+                const fadeEnd = fadeThreshold * 1.5;
                 
-                if (currentZoom >= fadeThreshold) {
+                if (currentZoom >= fadeEnd) {
                     return 1;
                 } else if (currentZoom > fadeStart) {
-                    return (currentZoom - fadeStart) / (fadeThreshold - fadeStart);
+                    return (currentZoom - fadeStart) / (fadeEnd - fadeStart);
                 } else {
                     return 0;
                 }
@@ -439,28 +450,40 @@ export class GraphRenderer {
     private setupZoom() {
         // Zoom is already set up in setupSVG, but let's enhance it
         this.zoom = d3.zoom<SVGSVGElement, unknown>()
-            .scaleExtent([0.1, 4])
+            .scaleExtent([0.1, 10])
             .on('zoom', (event) => {
                 this.g.attr('transform', event.transform);
                 
                 // Handle text fading based on zoom level with smooth transition
                 const zoomLevel = event.transform.k;
-                const fadeThreshold = this.plugin.settings.textFadeThreshold || 0.7;
+                // Convert normalized threshold (-3 to 3) to actual zoom level
+                // -3 = -1.5 zoom, 0 = 1.5 zoom, 3 = 4.5 zoom
+                const normalizedThreshold = this.plugin.settings.textFadeThreshold ?? 0;
+                const fadeThreshold = 1.5 + normalizedThreshold; // Maps -3->-1.5, 0->1.5, 3->4.5
                 const fadeStart = fadeThreshold * 0.43; // Start fading in at 43% of threshold value
+                const fadeEnd = fadeThreshold * 1.5; // Full opacity at 150% of threshold
                 
                 // Calculate opacity based on zoom level
                 let baseOpacity = 0;
-                if (zoomLevel >= fadeThreshold) {
-                    baseOpacity = 1; // Full opacity above threshold
+                if (zoomLevel >= fadeEnd) {
+                    baseOpacity = 1; // Full opacity above fadeEnd
                 } else if (zoomLevel > fadeStart) {
-                    // Gradual fade between fadeStart and fadeThreshold
-                    baseOpacity = (zoomLevel - fadeStart) / (fadeThreshold - fadeStart);
+                    // Gradual fade between fadeStart and fadeEnd (longer range)
+                    baseOpacity = (zoomLevel - fadeStart) / (fadeEnd - fadeStart);
                 } else {
                     baseOpacity = 0; // Hidden below fadeStart
                 }
                 
+                // Counter-scale text labels so they don't grow/shrink proportionally with zoom
+                const textScale = 1 / Math.pow(zoomLevel, 0.85);
                 this.nodeElements?.selectAll('foreignObject')
-                    .style('opacity', baseOpacity);
+                    .style('opacity', baseOpacity)
+                    .attr('transform', `scale(${textScale})`);
+                
+                // Counter-scale nodes so they stay a consistent visual size
+                const nodeScale =1/ Math.pow(zoomLevel, 0.2);
+                this.nodeElements?.selectAll('circle')
+                    .style('transform', `scale(${nodeScale})`);
             });
 
         this.svg.call(this.zoom);
@@ -482,7 +505,7 @@ export class GraphRenderer {
 
         // Add zoom behavior
         this.zoom = d3.zoom<SVGSVGElement, unknown>()
-            .scaleExtent([0.1, 4])
+            .scaleExtent([0.1, 10])
             .on('zoom', (event) => {
                 this.g.attr('transform', event.transform);
             });
@@ -701,21 +724,13 @@ export class GraphRenderer {
             const edgePair = `${sourceId}|${targetId}`;
             const highlight = this.highlightedEdges.has(edgePair);
             
-            // Update solid lines
+            // Update solid lines - connect center to center since nodes are CSS-scaled
             const dx = target.x! - source.x!;
             const dy = target.y! - source.y!;
-            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-            const rSource = getNodeRadius(source);
-            const rTarget = getNodeRadius(target);
-            const arrowPad = showArrows ? 6 : 0; // back off a bit more for arrowhead visibility
-            const totalBackoff = Math.min(dist / 2, rSource);
-            const totalForeoff = Math.min(dist / 2, rTarget); // + arrowpad? 
-            const ux = dx / dist;
-            const uy = dy / dist;
-            const x1 = source.x! + ux * totalBackoff;
-            const y1 = source.y! + uy * totalBackoff;
-            const x2 = target.x! - ux * totalForeoff;
-            const y2 = target.y! - uy * totalForeoff;
+            const x1 = source.x!;
+            const y1 = source.y!;
+            const x2 = target.x!;
+            const y2 = target.y!;
 
             group.select('line.solid-link')
                 .attr('x1', x1)
@@ -733,9 +748,11 @@ export class GraphRenderer {
                 const normalizedSim = Math.max(0, (sim - similarityThreshold) / (1 - similarityThreshold));
                 
                 // Spacing inversely proportional to similarity: higher similarity = tighter spacing
-                // Range: 80px (low sim) to 3px (high sim) for more obvious difference
-                const minSpacing = 3;
-                const maxSpacing = 80;
+                // User setting is normalized (1 = 20px base), scale from base*0.25 (high sim) to base*3 (low sim)
+                const spacingMultiplier = this.plugin.settings.dottedLinkSpacing ?? 1;
+                const baseSpacing = spacingMultiplier * 20; // 1 = 20px
+                const minSpacing = baseSpacing * 0.25;
+                const maxSpacing = baseSpacing * 3;
                 const spacing = maxSpacing - normalizedSim * (maxSpacing - minSpacing);
                 
                 group.select('line.similarity-link')
@@ -775,18 +792,21 @@ export class GraphRenderer {
             .attr('marker-end', showArrows ? 'url(#arrow)' : null);
     }
 
-    setTextFadeThreshold(threshold: number) {
+    setTextFadeThreshold(normalizedThreshold: number) {
         // Implement smooth text fading based on zoom level
+        // Convert normalized threshold (-3 to 3) to actual zoom level
         const svgNode = this.svg.node();
         if (!svgNode) return;
         const currentZoom = d3.zoomTransform(svgNode).k;
-        const fadeStart = threshold * 0.43; // Start at 43% of threshold value
+        const threshold = 1.5 + normalizedThreshold; // Maps -3->-1.5, 0->1.5, 3->4.5
+        const fadeStart = threshold * 0.43;
+        const fadeEnd = threshold * 1.5;
         
         let opacity = 0;
-        if (currentZoom >= threshold) {
+        if (currentZoom >= fadeEnd) {
             opacity = 1;
         } else if (currentZoom > fadeStart) {
-            opacity = (currentZoom - fadeStart) / (threshold - fadeStart);
+            opacity = (currentZoom - fadeStart) / (fadeEnd - fadeStart);
         }
         
         this.nodeElements.selectAll('foreignObject')
@@ -852,6 +872,24 @@ updateNodeSize(size: number) {
     updateDottedLinkSize(size: number) {
         this.linkElements.selectAll('line.similarity-link')
             .attr('stroke-width', size * 2);
+    }
+
+    updateDottedLinkSpacing(spacingMultiplier: number) {
+        const similarityThreshold = this.plugin.settings.similarityThreshold;
+        const baseSpacing = spacingMultiplier * 20; // 1 = 20px
+        this.linkElements.each((d, i, nodes) => {
+            const group = d3.select(nodes[i]);
+            const similarity = group.attr('data-similarity');
+            if (similarity) {
+                const sim = parseFloat(similarity);
+                const normalizedSim = Math.max(0, (sim - similarityThreshold) / (1 - similarityThreshold));
+                const minSpacing = baseSpacing * 0.25;
+                const maxSpacing = baseSpacing * 3;
+                const spacing = maxSpacing - normalizedSim * (maxSpacing - minSpacing);
+                group.select('line.similarity-link')
+                    .style('stroke-dasharray', `0 ${spacing}`);
+            }
+        });
     }
 
     updateLinkForce(strength: number) {

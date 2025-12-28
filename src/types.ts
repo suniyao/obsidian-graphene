@@ -45,6 +45,7 @@ export interface BetterGraphSettings {
     maxLinkThickness: number;
     linkThickness: Record<string, number>; // Custom thickness per link
     dottedLinkThickness: number;
+    dottedLinkSpacing: number; // Base spacing between dots (higher = more spread out)
 }
 
 export const DEFAULT_SETTINGS: BetterGraphSettings = {
@@ -72,10 +73,11 @@ export const DEFAULT_SETTINGS: BetterGraphSettings = {
     showArrows: false,     // Added default
     showParticleAnimation: true, // Added default
     
-    textFadeThreshold: 1.2, // Added default
+    textFadeThreshold: 0, // Normalized: -1 to 1, where 0 = 1.5 actual zoom level
     nodeSize: 6,
     defaultLinkThickness: 0.5,
     dottedLinkThickness: 1.25,
+    dottedLinkSpacing: 1.2, // Normalized spacing multiplier (1 = default, higher = more spread out)
     
     // forces
     centerForce: 0.7,     

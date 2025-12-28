@@ -38,9 +38,9 @@ export class GraphControls {
                 if (this.view.renderer) this.view.renderer.toggleParticleAnimation(enabled);
             });
 
-            // Text fade threshold
-            this.createSlider(content, 'Text fade threshold', 0.2, 2.0, 0.1, 
-                this.plugin.settings.textFadeThreshold || 0.7, (value) => {
+            // Text fade threshold (normalized: -3 to 3, where 0 = 1.5 actual zoom level)
+            this.createSlider(content, 'Text fade threshold', -3, 3, 0.1, 
+                this.plugin.settings.textFadeThreshold ?? 0, (value) => {
                 this.plugin.settings.textFadeThreshold = value;
                 if (this.view.renderer) this.view.renderer.setTextFadeThreshold(value);
             }, async (value) => {
@@ -75,6 +75,16 @@ export class GraphControls {
                 if (this.view.renderer) this.view.renderer.updateDottedLinkSize(value);
             }, async (value) => {
                 this.plugin.settings.dottedLinkThickness = value;
+                await this.plugin.saveSettings();
+            });
+
+            // Dotted link spacing
+            this.createSlider(content, 'Dotted link spacing', 0.1, 2, 0.1, 
+                this.plugin.settings.dottedLinkSpacing ?? 1, (value) => {
+                this.plugin.settings.dottedLinkSpacing = value;
+                if (this.view.renderer) this.view.renderer.updateDottedLinkSpacing(value);
+            }, async (value) => {
+                this.plugin.settings.dottedLinkSpacing = value;
                 await this.plugin.saveSettings();
             });
 
@@ -140,32 +150,33 @@ export class GraphControls {
         const header = section.createDiv('section-header');
         
         const chevron = header.createDiv('section-chevron');
-        setIcon(chevron, 'chevron-right');
+        setIcon(chevron, 'chevron-down');
         
         header.createSpan({ text: title, cls: 'section-title' });
         
         const content = section.createDiv('section-content');
-        content.addClass('is-hidden');
         
-        // Filters starts expanded
-        if (title === 'Filters') {
-            content.removeClass('is-hidden');
-            content.addClass('is-visible');
-            setIcon(chevron, 'chevron-down');
-        }
-        
-        header.addEventListener('click', () => {
-            const isOpen = content.hasClass('is-visible');
-            if (isOpen) {
-                content.removeClass('is-visible');
-                content.addClass('is-hidden');
-                setIcon(chevron, 'chevron-right');
-            } else {
-                content.removeClass('is-hidden');
-                content.addClass('is-visible');
+        // Helper to toggle state
+        const toggleSection = (open: boolean) => {
+            if (open) {
+                content.style.display = 'block';
                 setIcon(chevron, 'chevron-down');
+            } else {
+                content.style.display = 'none';
+                setIcon(chevron, 'chevron-right');
             }
-        });
+        };
+
+        // Default state
+        const startOpen = title === 'Display';
+        toggleSection(startOpen);
+        
+        // Use onclick to ensure it works
+        header.onclick = (e) => {
+            e.stopPropagation(); // Prevent bubbling issues
+            const isHidden = content.style.display === 'none';
+            toggleSection(isHidden);
+        };
         
         buildContent(content);
     }
@@ -187,6 +198,12 @@ export class GraphControls {
     private createSlider(parent: HTMLElement, label: string, min: number, max: number, step: number, 
         value: number, onInput: (value: number) => void, onChange?: (value: number) => void) {
         const container = parent.createDiv('slider-container');
+        // Force full width layout via inline styles
+        container.style.width = '100%';
+        container.style.display = 'flex';
+        container.style.flexDirection = 'column';
+        container.style.marginBottom = '12px';
+
         container.createEl('span', { text: label, cls: 'slider-label' });
         
         const slider = new SliderComponent(container)
@@ -196,6 +213,10 @@ export class GraphControls {
         
         slider.sliderEl.addClass('slider');
         slider.sliderEl.addClass('w-full');
+        
+        // Force slider width
+        slider.sliderEl.style.width = '100%';
+        slider.sliderEl.style.display = 'block';
 
         // Handle real-time updates (dragging)
         slider.sliderEl.addEventListener('input', () => {
