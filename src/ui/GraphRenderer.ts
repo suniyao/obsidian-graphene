@@ -228,7 +228,7 @@ export class GraphRenderer {
                     Math.min(2 * 16, 0.8 * 16 + Math.log(d.connectionCount + 1) / Math.log(10) * 10) : 
                     0.8 * 16) : 
                 16; // Approximate node radius
-            const yOffset = nodeRadius-10;
+            const yOffset = nodeRadius -10;
             
             // Calculate font sizes for consistent text wrapping
             const baseFontSize = d.type === 'tag' ? 11 : 12;
