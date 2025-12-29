@@ -168,69 +168,67 @@ async loadGraphData() {
         });
     }
     
-    // Create nodes for tags if enabled
-    if (this.filters.showTags) {
-        const allTags = new Set<string>();
+    // Create nodes for tags (always create them, visibility handled by renderer)
+    const allTags = new Set<string>();
+    
+    // Collect all tags and count connections
+    for (const file of files) {
+        const cache = this.app.metadataCache.getFileCache(file);
         
-        // Collect all tags and count connections
-        for (const file of files) {
-            const cache = this.app.metadataCache.getFileCache(file);
-            
-            if (cache?.tags) {
-                cache.tags.forEach(tag => {
-                    allTags.add(tag.tag);
-                    tagConnectionCount.set(tag.tag, (tagConnectionCount.get(tag.tag) || 0) + 1);
-                });
-            }
+        if (cache?.tags) {
+            cache.tags.forEach(tag => {
+                allTags.add(tag.tag);
+                tagConnectionCount.set(tag.tag, (tagConnectionCount.get(tag.tag) || 0) + 1);
+            });
+        }
 
-            if (cache?.frontmatter) {
-                const aiTags = cache.frontmatter['ai-tags'];
-                if (Array.isArray(aiTags)) {
-                    aiTags.forEach(tag => {
-                        const tagWithHash = `#${tag}`;
-                        allTags.add(tagWithHash);
-                        tagConnectionCount.set(tagWithHash, (tagConnectionCount.get(tagWithHash) || 0) + 1);
-                    });
-                } else if (typeof aiTags === 'string') {
-                    try {
-                        const parsed = JSON.parse(aiTags);
-                        if (Array.isArray(parsed)) {
-                            parsed.forEach(tag => {
-                                const tagWithHash = `#${tag}`;
-                                allTags.add(tagWithHash);
-                                tagConnectionCount.set(tagWithHash, (tagConnectionCount.get(tagWithHash) || 0) + 1);
-                            });
-                        }
-                    } catch {
-                        const tagMatches = aiTags.match(/["']([^"']+)["']/g);
-                        if (tagMatches) {
-                            tagMatches.forEach(match => {
-                                const tag = match.replace(/["']/g, '');
-                                const tagWithHash = `#${tag}`;
-                                allTags.add(tagWithHash);
-                                tagConnectionCount.set(tagWithHash, (tagConnectionCount.get(tagWithHash) || 0) + 1);
-                            });
-                        }
+        if (cache?.frontmatter) {
+            const aiTags = cache.frontmatter['ai-tags'];
+            if (Array.isArray(aiTags)) {
+                aiTags.forEach(tag => {
+                    const tagWithHash = `#${tag}`;
+                    allTags.add(tagWithHash);
+                    tagConnectionCount.set(tagWithHash, (tagConnectionCount.get(tagWithHash) || 0) + 1);
+                });
+            } else if (typeof aiTags === 'string') {
+                try {
+                    const parsed = JSON.parse(aiTags);
+                    if (Array.isArray(parsed)) {
+                        parsed.forEach(tag => {
+                            const tagWithHash = `#${tag}`;
+                            allTags.add(tagWithHash);
+                            tagConnectionCount.set(tagWithHash, (tagConnectionCount.get(tagWithHash) || 0) + 1);
+                        });
+                    }
+                } catch {
+                    const tagMatches = aiTags.match(/["']([^"']+)["']/g);
+                    if (tagMatches) {
+                        tagMatches.forEach(match => {
+                            const tag = match.replace(/["']/g, '');
+                            const tagWithHash = `#${tag}`;
+                            allTags.add(tagWithHash);
+                            tagConnectionCount.set(tagWithHash, (tagConnectionCount.get(tagWithHash) || 0) + 1);
+                        });
                     }
                 }
             }
         }
-        
-        // Create tag nodes with connection count
-        allTags.forEach(tag => {
-            tagNodes.set(tag, {
-                id: tag,
-                name: tag,
-                path: tag,
-                x: 0,
-                y: 0,
-                vx: 0,
-                vy: 0,
-                type: 'tag' as const,
-                connectionCount: tagConnectionCount.get(tag) || 1
-            });
-        });
     }
+    
+    // Create tag nodes with connection count
+    allTags.forEach(tag => {
+        tagNodes.set(tag, {
+            id: tag,
+            name: tag,
+            path: tag,
+            x: 0,
+            y: 0,
+            vx: 0,
+            vy: 0,
+            type: 'tag' as const,
+            connectionCount: tagConnectionCount.get(tag) || 1
+        });
+    });
     
     // Combine all nodes
     this.nodes = [...Array.from(nodeMap.values()), ...Array.from(tagNodes.values())];
@@ -246,11 +244,9 @@ async loadGraphData() {
         this.createEmbeddingBasedLinks(nodeMap);
     }
     
-    // Create tag links
-    if (this.filters.showTags) {
-        this.createTagLinks(files, nodeMap, tagNodes);
-        console.debug('Tag links created:', this.links.filter(l => l.type === 'tag-link').length);
-    }
+    // Create tag links (always create them)
+    this.createTagLinks(files, nodeMap, tagNodes);
+    console.debug('Tag links created:', this.links.filter(l => l.type === 'tag-link').length);
 
     if (this.renderer && this.renderer.isInitialized) {
         this.renderer.updateData(this.nodes, this.links);
