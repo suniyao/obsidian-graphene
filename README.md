@@ -23,9 +23,10 @@ Graphene transforms your Obsidian vault into an interactive, semantic knowledge 
 
 ### Manual Installation
 
-1. Download the latest release from the [GitHub releases page](https://github.com/suniyao/obsidian-graphene/releases).
-2. Extract the `graphene` folder into your vault's `.obsidian/plugins/` directory.
-3. Reload Obsidian and enable **Graphene** in Community Plugins.
+1. Clone this repo to your vault's `.obsidian/plugin/` directory.
+2. Reload Obsidian and enable **Graphene** in Community Plugins.
+
+> This plugin is yet not on community plugin browser in Obsidian, but we are actively working to get it featured in the [plugin directory](https://obsidian.md/plugins).
 
 ## Setup & Configuration
 
