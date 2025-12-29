@@ -256,7 +256,7 @@ export class GraphRenderer {
                 .style('transform-origin', `${maxLabelWidth / 2}px 0px`) // Center-top origin for scaling
                 .style('transform-box', 'fill-box');
             
-            const div = fo.append('xhtml:div')
+            fo.append('xhtml:div')
                 .style('width', '100%')
                 .style('text-align', 'center')
                 .style('word-wrap', 'break-word')
@@ -292,8 +292,8 @@ export class GraphRenderer {
         connectedNodeIds.add(hoveredNode.id);
         
         this.links.forEach(link => {
-            const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
-            const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
+            const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
+            const targetId = typeof link.target === 'string' ? link.target : link.target.id;
             
             // Check if the link meets the similarity threshold (or is not a similarity link)
             const type2 = link.type;
@@ -336,8 +336,8 @@ export class GraphRenderer {
         const showArrows2 = this.showArrows;
         this.linkElements.each(function(d: GraphLink) {
             const group = d3.select(this);
-            const sourceId = typeof d.source === 'string' ? d.source : (d.source as GraphNode).id;
-            const targetId = typeof d.target === 'string' ? d.target : (d.target as GraphNode).id;
+            const sourceId = typeof d.source === 'string' ? d.source : d.source.id;
+            const targetId = typeof d.target === 'string' ? d.target : d.target.id;
             const edgePair = `${sourceId}|${targetId}`;
             // An edge is highlighted if it's in our connected edges set (already filtered to involve hovered node)
             const highlight = connectedEdges.has(edgePair);
@@ -760,20 +760,12 @@ export class GraphRenderer {
     private ticked() {
         // Update link positions
         const similarityThreshold = this.plugin.settings.similarityThreshold;
-        const getNodeRadius = (n: GraphNode) => this.getNodeRadius(n);
-        const showArrows = this.showArrows;
         this.linkElements.each((d: GraphLink, index, groups) => {
             const group = d3.select(groups[index]);
             const source = d.source as GraphNode;
             const target = d.target as GraphNode;
-            const sourceId = source.id;
-            const targetId = target.id;
-            const edgePair = `${sourceId}|${targetId}`;
-            const highlight = this.highlightedEdges.has(edgePair);
             
             // Update solid lines - connect center to center since nodes are CSS-scaled
-            const dx = target.x! - source.x!;
-            const dy = target.y! - source.y!;
             const x1 = source.x!;
             const y1 = source.y!;
             const x2 = target.x!;
@@ -824,8 +816,8 @@ export class GraphRenderer {
         // Update link visibility
         this.linkElements
             .style('display', d => {
-                const source = typeof d.source === 'string' ? d.source : (d.source as GraphNode).id;
-                const target = typeof d.target === 'string' ? d.target : (d.target as GraphNode).id;
+                const source = typeof d.source === 'string' ? d.source : d.source.id;
+                const target = typeof d.target === 'string' ? d.target : d.target.id;
                 const sourceNode = this.nodes.find(n => n.id === source);
                 const targetNode = this.nodes.find(n => n.id === target);
                 return (sourceNode?.hidden || targetNode?.hidden) ? 'none' : 'block';

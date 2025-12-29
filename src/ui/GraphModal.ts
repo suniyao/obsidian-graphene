@@ -9,6 +9,7 @@ export class BetterGraphModal extends Modal {
     links: GraphLink[] = [];
     simulation: d3.Simulation<GraphNode, GraphLink>;
     svg: d3.Selection<SVGSVGElement, unknown, null, undefined>;
+    private zoomBehavior: d3.ZoomBehavior<SVGSVGElement, unknown>;
 
     constructor(app: App, plugin: CombinedPlugin) {
         super(app);
@@ -61,16 +62,19 @@ export class BetterGraphModal extends Modal {
             const linkId = link.id;
             const currentThickness = this.plugin.settings.linkThickness[linkId] || this.plugin.settings.defaultLinkThickness;
             
+            const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
+            const targetId = typeof link.target === 'string' ? link.target : link.target.id;
+
             const control = thicknessPanel.createDiv({ cls: 'thickness-control' });
             control.createEl('label', { 
-                text: `${link.source} → ${link.target}`,
+                text: `${sourceId} → ${targetId}`,
                 cls: 'thickness-label'
             });
             
             const slider = control.createEl('input', {
                 type: 'range',
                 cls: 'thickness-slider'
-            }) as HTMLInputElement;
+            });
             slider.min = '0.5';
             slider.max = '5';
             slider.step = '0.5';
@@ -147,12 +151,12 @@ export class BetterGraphModal extends Modal {
 
         // Add zoom behavior
         const g = this.svg.append('g');
-        const zoom = d3.zoom<SVGSVGElement, unknown>()
+        this.zoomBehavior = d3.zoom<SVGSVGElement, unknown>()
             .scaleExtent([0.1, 4])
             .on('zoom', (event) => {
                 g.attr('transform', event.transform);
             });
-        this.svg.call(zoom);
+        this.svg.call(this.zoomBehavior);
 
         // Create arrow markers for directed links
         this.svg.append('defs').selectAll('marker')
@@ -302,9 +306,6 @@ export class BetterGraphModal extends Modal {
         const width = this.svg.node()!.clientWidth;
         const height = this.svg.node()!.clientHeight;
         
-        // Get current transform
-        const currentTransform = d3.zoomTransform(this.svg.node()!);
-        
         // Reset positions
         this.simulation.nodes().forEach(node => {
             node.fx = null;
@@ -328,8 +329,7 @@ export class BetterGraphModal extends Modal {
 
     resetZoom() {
         this.svg.transition().duration(750).call(
-            d3.zoom<SVGSVGElement, unknown>().transform,
-            d3.zoomIdentity
+            (s) => this.zoomBehavior.transform(s, d3.zoomIdentity)
         );
     }
 

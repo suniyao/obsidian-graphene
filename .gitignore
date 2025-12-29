@@ -22,3 +22,5 @@ data.json
 .DS_Store
 
 embedding-cache.json
+.eslintrc.backup
+eslint.config.mjs
