@@ -172,7 +172,7 @@ export class CombinedSettingTab extends PluginSettingTab {
         // Add after the embedding model setting
         new Setting(containerEl)
             .setName('Generate embeddings')
-            .setDesc('Generate embeddings for all markdown files to enable similarity search.') 
+            .setDesc('Generate embeddings for all markdown files to enable similarity search') 
             .addButton(button => button
                 .setButtonText('Generate all')
                 .setCta()
