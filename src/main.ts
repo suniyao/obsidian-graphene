@@ -65,7 +65,7 @@ export default class CombinedPlugin extends Plugin {
         );
 
         // Better Graph ribbon icon
-        this.addRibbonIcon('dot-network', 'Graphene View', () => {
+        this.addRibbonIcon('dot-network', 'Graphene view', () => {
             this.activateView();
         });
 
