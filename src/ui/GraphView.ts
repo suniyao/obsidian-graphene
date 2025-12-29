@@ -322,8 +322,8 @@ createTagLinks(files: TFile[], nodeMap: Map<string, GraphNode>, tagNodes: Map<st
         const manualLinkPairs = new Set<string>();
         this.links.forEach(link => {
             if (link.type === 'manual-link') {
-                const sourceId = typeof link.source === 'string' ? link.source : (link.source as GraphNode).id;
-                const targetId = typeof link.target === 'string' ? link.target : (link.target as GraphNode).id;
+                const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
+                const targetId = typeof link.target === 'string' ? link.target : link.target.id;
                 // Store both directions since manual links are directional but similarity is bidirectional
                 manualLinkPairs.add(`${sourceId}|${targetId}`);
                 manualLinkPairs.add(`${targetId}|${sourceId}`);

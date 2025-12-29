@@ -1,4 +1,4 @@
-import { Plugin, TFile, Notice, requestUrl } from 'obsidian';
+import { Plugin, Notice } from 'obsidian';
 import { BetterGraphView, VIEW_TYPE_GRAPH } from './ui/GraphView';
 import { CombinedSettingTab } from './ui/GraphSettings';
 import { BetterGraphSettings, DEFAULT_SETTINGS } from './types';
@@ -276,7 +276,7 @@ updateEmbeddingStatusUI(): void {
         // Check provider configuration
         const provider = this.settings.embeddingProvider || 'ollama';
         if (provider === 'openai' && !this.settings.openaiApiKey) {
-            new Notice('Please configure OpenAI API key in settings first.');
+            new Notice('Please configure OpenAI API key in settings first.'); // /skip
             return;
         }
 

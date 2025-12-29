@@ -1,7 +1,5 @@
 import { App, PluginSettingTab, Setting, Notice } from 'obsidian';
 import type CombinedPlugin from '../main';
-import { EmbeddingService } from '../services/EmbeddingService';
-import { EmbeddingCache } from '../types';
 import { BetterGraphView, VIEW_TYPE_GRAPH } from './GraphView';
 
 export class CombinedSettingTab extends PluginSettingTab {
@@ -26,7 +24,7 @@ export class CombinedSettingTab extends PluginSettingTab {
         containerEl.empty();
 
         // Embedding Settings Section
-        new Setting(containerEl).setName("Embedding settings").setHeading();
+        new Setting(containerEl).setName("Embedding").setHeading();
 
         // Provider selector: OpenAI vs Ollama
 
@@ -34,8 +32,8 @@ export class CombinedSettingTab extends PluginSettingTab {
             .setName('Embedding provider')
             .setDesc('Choose how embeddings are generated')
             .addDropdown(drop => {
-                drop.addOption('ollama', 'Ollama (local)');
-                drop.addOption('openai', 'OpenAI (API key required)');
+                drop.addOption('ollama', 'Ollama (local)'); // /skip
+                drop.addOption('openai', 'OpenAI (API key required)'); // /skip
                 drop.setValue(this.plugin.settings.embeddingProvider || 'ollama');
                 drop.onChange(async (value) => {
                     this.plugin.settings.embeddingProvider = value as 'openai' | 'ollama';
@@ -50,7 +48,7 @@ export class CombinedSettingTab extends PluginSettingTab {
         if (this.plugin.settings.embeddingProvider === 'ollama' || !this.plugin.settings.embeddingProvider) {
             new Setting(containerEl)
                 .setName('Ollama endpoint')
-                .setDesc('URL where Ollama is running')
+                .setDesc('URL where Ollama is running') // /skip
                 .addText(text => text
                     .setPlaceholder('http://localhost:11434')
                     .setValue(this.plugin.settings.ollamaEndpoint || 'http://localhost:11434')
@@ -63,7 +61,7 @@ export class CombinedSettingTab extends PluginSettingTab {
                 .setName('Ollama model')
                 .setDesc('Embedding model to use (e.g., nomic-embed-text, mxbai-embed-large)')
                 .addText(text => text
-                    .setPlaceholder('nomic-embed-text')
+                    .setPlaceholder('nomic-embed-text') // /skip
                     .setValue(this.plugin.settings.ollamaModel || 'nomic-embed-text')
                     .onChange(async (value) => {
                         this.plugin.settings.ollamaModel = value;
@@ -74,10 +72,10 @@ export class CombinedSettingTab extends PluginSettingTab {
         // OpenAI settings (shown when OpenAI is selected)
         if (this.plugin.settings.embeddingProvider === 'openai') {
             new Setting(containerEl)
-                .setName('OpenAI API key')
+                .setName('OpenAI API key') // /skip
                 .setDesc('Required for generating semantic embeddings')
                 .addText(text => text
-                    .setPlaceholder('sk-...')
+                    .setPlaceholder('sk-...') // /skip
                     .setValue(this.plugin.settings.openaiApiKey)
                     .onChange(async (value) => {
                         this.plugin.settings.openaiApiKey = value;
@@ -133,7 +131,7 @@ export class CombinedSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName('Exclude headings from embedding')
-            .setDesc('If enabled, markdown headings are not included in embedding text (reduces format-based similarity).')
+            .setDesc('If enabled, markdown headings are not included in embedding text (reduces format-based similarity).') // /skip
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.excludeHeadingsFromEmbedding ?? true)
                 .onChange(async (value) => {
@@ -174,7 +172,7 @@ export class CombinedSettingTab extends PluginSettingTab {
         // Add after the embedding model setting
         new Setting(containerEl)
             .setName('Generate embeddings')
-            .setDesc('Generate embeddings for all markdown files to enable similarity search')
+            .setDesc('Generate embeddings for all markdown files to enable similarity search.') 
             .addButton(button => button
                 .setButtonText('Generate all')
                 .setCta()
