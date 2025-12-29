@@ -19,14 +19,33 @@ export class GraphRenderer {
     private isAnimating: boolean = true;
     private showArrows: boolean = false;
     private highlightedEdges: Set<string> = new Set();
+    private maxTagConnectionCount: number = 1;
+
+    private calculateMaxConnections() {
+        this.maxTagConnectionCount = 0;
+        for (const node of this.nodes) {
+            if (node.type === 'tag' && node.connectionCount) {
+                this.maxTagConnectionCount = Math.max(this.maxTagConnectionCount, node.connectionCount);
+            }
+        }
+        if (this.maxTagConnectionCount === 0) this.maxTagConnectionCount = 1;
+    }
 
     // Compute the visual radius of a node, mirroring circle rendering logic
     private getNodeRadius(node: GraphNode): number {
-        if (node.type === 'tag' && node.connectionCount) {
-            const minSize = this.plugin.settings.nodeSize * 0.8;
-            const maxSize = this.plugin.settings.nodeSize * 4;
-            const scaleFactor = (node.connectionCount + 1)/ 10;
-            return Math.min(maxSize, minSize + scaleFactor * 10);
+        if (node.type === 'tag') {
+            if (node.connectionCount) {
+                const minSize = this.plugin.settings.nodeSize * 0.8;
+                const maxSize = this.plugin.settings.nodeSize * 3;
+                
+                // Use square root scaling relative to the maximum connection count
+                // This provides better differentiation than log scale while preventing
+                // extreme outliers from dominating too much (like linear would)
+                const ratio = Math.sqrt(node.connectionCount) / Math.sqrt(this.maxTagConnectionCount);
+                
+                return minSize + ratio * (maxSize - minSize);
+            }
+            return this.plugin.settings.nodeSize * 0.8;
         }
         return this.plugin.settings.nodeSize;
     }
@@ -63,6 +82,7 @@ export class GraphRenderer {
     initialize(nodes: GraphNode[], links: GraphLink[]) {
         this.nodes = nodes;
         this.links = links;
+        this.calculateMaxConnections();
         
         // Clear any existing content
         d3.select(this.container).selectAll('*').remove();
@@ -88,6 +108,7 @@ export class GraphRenderer {
         
         this.nodes = nodes;
         this.links = links;
+        this.calculateMaxConnections();
         
         // Update simulation
         this.simulation.nodes(this.nodes);
@@ -198,16 +219,7 @@ export class GraphRenderer {
 
     // Add circles with size based on connections for tags
     this.nodeElements.append('circle')
-        .attr('r', d => {
-            if (d.type === 'tag' && d.connectionCount) {
-                // Scale tag size based on connection count
-                const minSize = this.plugin.settings.nodeSize * 0.8;
-                const maxSize = this.plugin.settings.nodeSize * 2;
-                const scaleFactor = Math.log(d.connectionCount + 1) / Math.log(10); // Logarithmic scaling
-                return Math.min(maxSize, minSize + scaleFactor * 10);
-            }
-            return this.plugin.settings.nodeSize;
-        })
+        .attr('r', d => this.getNodeRadius(d))
         .attr('fill', d => {
             if (d.type === 'tag') {
                 return 'var(--text-success)';
@@ -221,14 +233,10 @@ export class GraphRenderer {
         // Add labels with text wrapping
         const maxLabelWidth = 240; // Max width in pixels
         
-        this.nodeElements.each(function(d) {
-            const group = d3.select(this);
-            const nodeRadius = d.type === 'tag' ? 
-                (d.connectionCount ? 
-                    Math.min(2 * 16, 0.8 * 16 + Math.log(d.connectionCount + 1) / Math.log(10) * 10) : 
-                    0.8 * 16) : 
-                16; // Approximate node radius
-            const yOffset = nodeRadius -10;
+        this.nodeElements.each((d, i, nodes) => {
+            const group = d3.select(nodes[i]);
+            const nodeRadius = this.getNodeRadius(d);
+            const yOffset = 0.9*nodeRadius;
             
             // Calculate font sizes for consistent text wrapping
             const baseFontSize = d.type === 'tag' ? 11 : 12;
@@ -654,14 +662,7 @@ export class GraphRenderer {
             (this.simulation.force('collision') as d3.ForceCollide<GraphNode>)
                 ?.radius((d: GraphNode) => {
                     if (d.type === 'tag' && !this.plugin.settings.showTags) return 0;
-
-                    if (d.type === 'tag' && d.connectionCount) {
-                        const minSize = this.plugin.settings.nodeSize * 0.8;
-                        const maxSize = this.plugin.settings.nodeSize * 2;
-                        const scaleFactor = Math.log(d.connectionCount + 1) / Math.log(10);
-                        return Math.min(maxSize, minSize + scaleFactor * 10) + 4;
-                    }
-                    return this.plugin.settings.nodeSize + 4;
+                    return this.getNodeRadius(d) + 4;
                 });
 
             this.simulation.alpha(0.3).restart();
@@ -884,39 +885,17 @@ export class GraphRenderer {
 
     // Add or update this method in the GraphRenderer class:
 
-updateNodeSize(size: number) {
-        // Only update file nodes, not tag nodes
+    updateNodeSize(size: number) {
+        // Update all nodes using the centralized radius calculation
         this.nodeElements?.selectAll('circle')
-            .attr('r', (d: GraphNode) => {
-                if (d.type === 'tag' && d.connectionCount) {
-                    // Keep tag size based on connections, don't change it
-                    const minSize = this.plugin.settings.nodeSize * 0.8;
-                    const maxSize = this.plugin.settings.nodeSize * 2;
-                    const scaleFactor = Math.log(d.connectionCount + 1) / Math.log(10);
-                    return Math.min(maxSize, minSize + scaleFactor * 10);
-                } else if (d.type === 'tag') {
-                    // Default tag size (unchanged)
-                    return this.plugin.settings.nodeSize * 0.8;
-                } else {
-                    // File nodes - apply the new size
-                    return size;
-                }
-            });
+            .attr('r', (d: GraphNode) => this.getNodeRadius(d));
         
         // Update collision force to account for new sizes
         if (this.simulation) {
             (this.simulation.force('collision') as d3.ForceCollide<GraphNode>)
                 ?.radius(d => {
-                    if (d.type === 'tag' && d.connectionCount) {
-                        const minSize = this.plugin.settings.nodeSize * 0.8;
-                        const maxSize = this.plugin.settings.nodeSize * 2;
-                        const scaleFactor = Math.log(d.connectionCount + 1) / Math.log(10);
-                        return Math.min(maxSize, minSize + scaleFactor * 10) + 8;
-                    } else if (d.type === 'tag') {
-                        return this.plugin.settings.nodeSize * 0.8 + 8;
-                    } else {
-                        return size + 8;
-                    }
+                    if (d.type === 'tag' && !this.plugin.settings.showTags) return 0;
+                    return this.getNodeRadius(d) + 4;
                 });
             
             this.simulation.alpha(0.3).restart();
