@@ -10,6 +10,10 @@ export class GraphRenderer {
     private view: BetterGraphView;
     private svg: d3.Selection<SVGSVGElement, unknown, null, undefined>;
     private g: d3.Selection<SVGGElement, unknown, null, undefined>;
+    private linksGroup: d3.Selection<SVGGElement, unknown, null, undefined>;
+    private nodesGroup: d3.Selection<SVGGElement, unknown, null, undefined>;
+    private dimmingLayer: d3.Selection<SVGRectElement, unknown, null, undefined>;
+    private highlightedGroup: d3.Selection<SVGGElement, unknown, null, undefined>;
     private simulation: d3.Simulation<GraphNode, GraphLink>;
     private nodes: GraphNode[] = [];
     private links: GraphLink[] = [];
@@ -156,13 +160,11 @@ export class GraphRenderer {
     }
 
     private setupLinks() {
-        this.g.selectAll('.links').remove();
-        
-        const linksGroup = this.g.append('g')
-            .attr('class', 'links');
+        this.linksGroup.selectAll('*').remove();
+        this.highlightedGroup.selectAll('.link-group').remove();
         
         // Create groups for each link
-        this.linkElements = linksGroup.selectAll<SVGGElement, GraphLink>('g.link-group')
+        this.linkElements = this.linksGroup.selectAll<SVGGElement, GraphLink>('g.link-group')
             .data(this.links)
             .join('g')
             .attr('class', d => `link-group ${d.type || 'normal'}`)
@@ -198,14 +200,15 @@ export class GraphRenderer {
                     .attr('marker-end', showArrows ? 'url(#arrow)' : null);
             }
         });
-    }private setupNodes() {
-    this.g.selectAll('.nodes').remove();
-    
-    this.nodeElements = this.g.append('g')
-        .attr('class', 'nodes')
-        .selectAll<SVGGElement, GraphNode>('g')
-        .data(this.nodes)
-        .join('g')
+    }
+
+    private setupNodes() {
+        this.nodesGroup.selectAll('*').remove();
+        this.highlightedGroup.selectAll('.node').remove();
+        
+        this.nodeElements = this.nodesGroup.selectAll<SVGGElement, GraphNode>('g')
+            .data(this.nodes)
+            .join('g')
         .attr('class', d => `node ${d.type || 'file'}`)
         .attr('opacity', d => {
             if (d.type === 'tag' && !this.plugin.settings.showTags) return 0;
@@ -311,6 +314,33 @@ export class GraphRenderer {
         // Remember highlighted edges so ticked() can keep dotted links in sync
         this.highlightedEdges = connectedEdges;
 
+        // Show dimming layer
+        this.dimmingLayer
+            .transition()
+            .duration(200)
+            .attr('opacity', 0.8);
+
+        // Move highlighted elements to highlighted group
+        const highlightedGroupNode = this.highlightedGroup.node();
+        if (highlightedGroupNode) {
+            // Move links first (so they are behind nodes)
+            this.linkElements.each(function(d) {
+                const sourceId = typeof d.source === 'string' ? d.source : d.source.id;
+                const targetId = typeof d.target === 'string' ? d.target : d.target.id;
+                const edgePair = `${sourceId}|${targetId}`;
+                if (connectedEdges.has(edgePair)) {
+                    highlightedGroupNode.appendChild(this);
+                }
+            });
+
+            // Move nodes
+            this.nodeElements.each(function(d) {
+                if (d.id === hoveredNode.id || connectedNodeIds.has(d.id)) {
+                    highlightedGroupNode.appendChild(this);
+                }
+            });
+        }
+
         // Update node styling
         this.nodeElements.selectAll('circle')
             .transition()
@@ -324,13 +354,7 @@ export class GraphRenderer {
                     return d.type === 'tag' ? 'var(--text-success)' : 'var(--text-muted)';
                 }
             })
-            .style('opacity', (d: GraphNode) => {
-                if (d.id === hoveredNode.id || connectedNodeIds.has(d.id)) {
-                    return 1;
-                } else {
-                    return 0.1;
-                }
-            });
+            .style('opacity', 1); // Keep full opacity as dimming layer handles the rest
 
         // Update link styling - highlight if edge pair contains hovered node
         const showArrows2 = this.showArrows;
@@ -347,7 +371,7 @@ export class GraphRenderer {
                 .transition()
                 .duration(200)
                 .style('stroke', highlight ? 'var(--interactive-accent)' : 'var(--text-muted)')
-                .attr('stroke-opacity', highlight ? 1 : 0.1)
+                .attr('stroke-opacity', highlight ? 1 : 0.6) // Keep visible behind dimming layer
                 .attr('marker-end', (d: GraphLink) => showArrows2 ? (highlight ? 'url(#arrow-accent)' : 'url(#arrow)') : null);
             
             // Update dots (for similarity links)
@@ -355,7 +379,7 @@ export class GraphRenderer {
                 .transition()
                 .duration(200)
                 .style('stroke', highlight ? 'var(--interactive-accent)' : 'var(--text-muted)')
-                .style('stroke-opacity', highlight ? 1 : 0.1);
+                .style('stroke-opacity', highlight ? 1 : 0.6);
         });
 
         // Update text styling (opacity + size + vertical offset)
@@ -387,10 +411,10 @@ export class GraphRenderer {
                     // Partial zoom: gradual fade with hover enhancement
                     if (d.id === hoveredNode.id) return 1;
                     if (connectedNodeIds.has(d.id)) return baseOpacity;
-                    return baseOpacity * 0.1; // Dimmed for unconnected
+                    return baseOpacity; // Keep base opacity behind dimming layer
                 } else {
                     // Full zoom: normal behavior
-                    return (d.id === hoveredNode.id || connectedNodeIds.has(d.id)) ? 1 : 0.1;
+                    return 1; // Keep full opacity behind dimming layer
                 }
             });
             
@@ -406,6 +430,25 @@ export class GraphRenderer {
             });
     })
     .on('mouseleave', () => {
+        // Hide dimming layer
+        this.dimmingLayer
+            .transition()
+            .duration(200)
+            .attr('opacity', 0);
+
+        // Move elements back to their original groups
+        const nodesGroupNode = this.nodesGroup.node();
+        const linksGroupNode = this.linksGroup.node();
+        
+        if (nodesGroupNode && linksGroupNode) {
+            this.nodeElements.each(function() {
+                nodesGroupNode.appendChild(this);
+            });
+            this.linkElements.each(function() {
+                linksGroupNode.appendChild(this);
+            });
+        }
+
         // Reset all styling
         this.nodeElements.selectAll('circle')
             .transition()
@@ -532,6 +575,24 @@ export class GraphRenderer {
 
         // Create main group
         this.g = this.svg.append('g');
+
+        // Create layers in order
+        this.linksGroup = this.g.append('g').attr('class', 'links');
+        this.nodesGroup = this.g.append('g').attr('class', 'nodes');
+        
+        // Dimming layer (initially hidden)
+        this.dimmingLayer = this.g.append('rect')
+            .attr('class', 'dimming-layer')
+            .attr('x', -50000)
+            .attr('y', -50000)
+            .attr('width', 100000)
+            .attr('height', 100000)
+            .attr('fill', 'var(--background-primary)')
+            .attr('opacity', 0)
+            .style('pointer-events', 'none');
+
+        // Highlighted group (on top of dimming layer)
+        this.highlightedGroup = this.g.append('g').attr('class', 'highlighted');
 
         // Add arrow markers
         this.svg.append('defs').selectAll('marker')
