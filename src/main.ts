@@ -66,7 +66,7 @@ export default class CombinedPlugin extends Plugin {
 
         // Better Graph ribbon icon
         this.addRibbonIcon('dot-network', 'Graphene view', () => {
-            this.activateView();
+            void this.activateView();
         });
 
         // Better Graph commands
@@ -74,7 +74,7 @@ export default class CombinedPlugin extends Plugin {
             id: 'open-better-graph-view',
             name: 'Open graph view',
             callback: () => {
-                this.activateView();
+                void this.activateView();
             }
         });
 
@@ -236,23 +236,19 @@ updateEmbeddingStatusUI(): void {
             cls: 'mod-cta embedding-update-button'
         });
         
-        updateButton.onclick = async () => {
-            updateButton.disabled = true;
-            updateButton.setText('Updating...');
-            await this.generateEmbeddings(true);
-            updateButton.disabled = false;
-            this.updateEmbeddingStatusUI();
+        updateButton.onclick = () => {
+            void (async () => {
+                updateButton.disabled = true;
+                updateButton.setText('Updating...');
+                await this.generateEmbeddings(true);
+                updateButton.disabled = false;
+                this.updateEmbeddingStatusUI();
+            })();
         };
     }
 }
 
-// ...existing code...
-
-    createStatusItem(container: HTMLElement, label: string, count: number, type: string): void {
-        const item = container.createDiv(`status-item status-${type}`);
-        item.createSpan({ text: label, cls: 'status-label' });
-        item.createSpan({ text: count.toString(), cls: 'status-count' });
-    }
+    // ...existing code...
 
     // Better Graph Methods
     async activateView() {
@@ -269,13 +265,14 @@ updateEmbeddingStatusUI(): void {
             leaf = newLeaf;
         }
         
-        workspace.revealLeaf(leaf);
+        void workspace.revealLeaf(leaf);
     }
 
     async generateEmbeddingsForAllNotes(): Promise<void> {
         // Check provider configuration
         const provider = this.settings.embeddingProvider || 'ollama';
         if (provider === 'openai' && !this.settings.openaiApiKey) {
+            // eslint-disable-next-line obsidianmd/ui/sentence-case
             new Notice('Please configure OpenAI API key in settings first.'); // /skip
             return;
         }

@@ -40,6 +40,7 @@ export class BetterGraphView extends ItemView {
     }
 
     async onOpen() {
+        await super.onOpen();
         const container = this.containerEl.children[1];
         container.empty();
         container.addClass('better-graph-view');
@@ -58,32 +59,20 @@ export class BetterGraphView extends ItemView {
         
         // Create control panel container
         const controlPanelContainer = mainContainer.createDiv('graph-control-panel');
-        controlPanelContainer.style.display = 'none'; // Start hidden
-        controlPanelContainer.style.width = '240px'; // Set width here (default was 240px in CSS)
+        controlPanelContainer.toggleClass('is-hidden', true); // Start hidden
         
         // Create control toggle button
         const controlToggle = mainContainer.createDiv('graph-control-toggle');
         setIcon(controlToggle, 'settings');
         
-        // Handle hover state in JS to ensure opacity works correctly
-        controlToggle.onmouseenter = () => {
-            controlToggle.style.background = 'linear-gradient(var(--background-modifier-hover), var(--background-modifier-hover)), var(--background-primary)';
-            controlToggle.style.color = 'var(--text-normal)';
-        };
-        
-        controlToggle.onmouseleave = () => {
-            controlToggle.style.background = 'var(--background-primary)';
-            controlToggle.style.color = 'var(--text-muted)';
-        };
-        
         // Helper to toggle visibility
         const togglePanel = (show: boolean) => {
             if (show) {
-                controlPanelContainer.style.display = 'flex';
-                controlToggle.style.display = 'none';
+                controlPanelContainer.toggleClass('is-hidden', false);
+                controlToggle.toggleClass('is-hidden', true);
             } else {
-                controlPanelContainer.style.display = 'none';
-                controlToggle.style.display = 'flex';
+                controlPanelContainer.toggleClass('is-hidden', true);
+                controlToggle.toggleClass('is-hidden', false);
             }
         };
 
@@ -99,11 +88,6 @@ export class BetterGraphView extends ItemView {
         filterTitle.createSpan({ text: 'Settings' });
         
         const actionsContainer = controlHeader.createDiv('graph-control-actions');
-        // Force flex layout via inline styles to ensure it works
-        actionsContainer.style.display = 'flex';
-        actionsContainer.style.flexDirection = 'row';
-        actionsContainer.style.alignItems = 'center';
-        actionsContainer.style.gap = '4px';
 
         const resetButton = actionsContainer.createDiv('graph-control-close');
         setIcon(resetButton, 'reset');

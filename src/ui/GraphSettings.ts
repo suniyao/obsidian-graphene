@@ -1,3 +1,4 @@
+/* eslint-disable obsidianmd/ui/sentence-case */
 import { App, PluginSettingTab, Setting, Notice } from 'obsidian';
 import type CombinedPlugin from '../main';
 import { BetterGraphView, VIEW_TYPE_GRAPH } from './GraphView';
@@ -32,8 +33,8 @@ export class CombinedSettingTab extends PluginSettingTab {
             .setName('Embedding provider')
             .setDesc('Choose how embeddings are generated')
             .addDropdown(drop => {
-                drop.addOption('ollama', 'Ollama (local)'); // /skip
-                drop.addOption('openai', 'OpenAI (API key required)'); // /skip
+                drop.addOption('ollama', 'Ollama (local)'); // /skip 
+                drop.addOption('openai', 'OpenAI (API key required)'); // /skip 
                 drop.setValue(this.plugin.settings.embeddingProvider || 'ollama');
                 drop.onChange(async (value) => {
                     this.plugin.settings.embeddingProvider = value as 'openai' | 'ollama';
@@ -53,8 +54,6 @@ export class CombinedSettingTab extends PluginSettingTab {
                     .setPlaceholder('http://localhost:11434')
                     .setValue(this.plugin.settings.ollamaEndpoint || 'http://localhost:11434')
                     .onChange(async (value) => {
-                        this.plugin.settings.ollamaEndpoint = value;
-                        await this.plugin.saveSettings();
                     }));
 
             new Setting(containerEl)
@@ -68,7 +67,6 @@ export class CombinedSettingTab extends PluginSettingTab {
                         await this.plugin.saveSettings();
                     }));
         }
-
         // OpenAI settings (shown when OpenAI is selected)
         if (this.plugin.settings.embeddingProvider === 'openai') {
             new Setting(containerEl)
@@ -165,9 +163,6 @@ export class CombinedSettingTab extends PluginSettingTab {
 
         // Actions Section
         new Setting(containerEl).setName("Actions").setHeading();
-
-
-        // In the CombinedSettingTab class, update the display method:
 
         // Add after the embedding model setting
         new Setting(containerEl)
