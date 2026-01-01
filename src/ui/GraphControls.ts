@@ -19,22 +19,22 @@ export class GraphControls {
 
         // Display Section
         this.createSection('Display', (content) => {
-            this.createToggle(content, 'Tags', this.plugin.settings.showTags, async (enabled) => {
+            this.createToggle(content, 'Tags', this.plugin.settings.showTags, (enabled) => {
                 this.plugin.settings.showTags = enabled;
                 this.view.filters.showTags = enabled;
-                await this.plugin.saveSettings();
+                void this.plugin.saveSettings();
                 if (this.view.renderer) this.view.renderer.toggleTags(enabled);
             });
             // Arrows
-            this.createToggle(content, 'Arrows', this.plugin.settings.showArrows || false, async (enabled) => {
+            this.createToggle(content, 'Arrows', this.plugin.settings.showArrows || false, (enabled) => {
                 this.plugin.settings.showArrows = enabled;
-                await this.plugin.saveSettings();
+                void this.plugin.saveSettings();
                 if (this.view.renderer) this.view.renderer.toggleArrows(enabled);
             });
             // Particle Animation
-            this.createToggle(content, 'Particle animation', this.plugin.settings.showParticleAnimation !== false, async (enabled) => {
+            this.createToggle(content, 'Particle animation', this.plugin.settings.showParticleAnimation !== false, (enabled) => {
                 this.plugin.settings.showParticleAnimation = enabled;
-                await this.plugin.saveSettings();
+                void this.plugin.saveSettings();
                 if (this.view.renderer) this.view.renderer.toggleParticleAnimation(enabled);
             });
 
@@ -43,9 +43,9 @@ export class GraphControls {
                 this.plugin.settings.textFadeThreshold ?? 0, (value) => {
                 this.plugin.settings.textFadeThreshold = value;
                 if (this.view.renderer) this.view.renderer.setTextFadeThreshold(value);
-            }, async (value) => {
+            }, (value) => {
                 this.plugin.settings.textFadeThreshold = value;
-                await this.plugin.saveSettings();
+                void this.plugin.saveSettings();
             });
 
             // Node size
@@ -53,9 +53,9 @@ export class GraphControls {
                 this.plugin.settings.nodeSize, (value) => {
                 this.plugin.settings.nodeSize = value;
                 if (this.view.renderer) this.view.renderer.updateNodeSize(value);
-            }, async (value) => {
+            }, (value) => {
                 this.plugin.settings.nodeSize = value;
-                await this.plugin.saveSettings();
+                void this.plugin.saveSettings();
             });
 
             // Solid link thickness
@@ -63,9 +63,9 @@ export class GraphControls {
                 this.plugin.settings.defaultLinkThickness, (value) => {
                 this.plugin.settings.defaultLinkThickness = value;
                 if (this.view.renderer) this.view.renderer.updateLinkThickness(value);
-            }, async (value) => {
+            }, (value) => {
                 this.plugin.settings.defaultLinkThickness = value;
-                await this.plugin.saveSettings();
+                void this.plugin.saveSettings();
             });
 
             // Dotted link thickness
@@ -73,9 +73,9 @@ export class GraphControls {
                 this.plugin.settings.dottedLinkThickness ?? Math.max(0.5, this.plugin.settings.defaultLinkThickness / 2), (value) => {
                 this.plugin.settings.dottedLinkThickness = value;
                 if (this.view.renderer) this.view.renderer.updateDottedLinkSize(value);
-            }, async (value) => {
+            }, (value) => {
                 this.plugin.settings.dottedLinkThickness = value;
-                await this.plugin.saveSettings();
+                void this.plugin.saveSettings();
             });
 
             // Dotted link spacing
@@ -83,9 +83,9 @@ export class GraphControls {
                 this.plugin.settings.dottedLinkSpacing ?? 1, (value) => {
                 this.plugin.settings.dottedLinkSpacing = value;
                 if (this.view.renderer) this.view.renderer.updateDottedLinkSpacing(value);
-            }, async (value) => {
+            }, (value) => {
                 this.plugin.settings.dottedLinkSpacing = value;
-                await this.plugin.saveSettings();
+                void this.plugin.saveSettings();
             });
 
             // Animate button
@@ -108,9 +108,9 @@ export class GraphControls {
                 this.plugin.settings.centerForce, (value) => {
                 this.plugin.settings.centerForce = value;
                 if (this.view.renderer) this.view.renderer.updateForces();
-            }, async (value) => {
+            }, (value) => {
                 this.plugin.settings.centerForce = value;
-                await this.plugin.saveSettings();
+                void this.plugin.saveSettings();
             });
 
             // Repel force
@@ -118,9 +118,9 @@ export class GraphControls {
                 this.plugin.settings.repulsionForce, (value) => {
                 this.plugin.settings.repulsionForce = value;
                 if (this.view.renderer) this.view.renderer.updateForces();
-            }, async (value) => {
+            }, (value) => {
                 this.plugin.settings.repulsionForce = value;
-                await this.plugin.saveSettings();
+                void this.plugin.saveSettings();
             });
 
             // Link force
@@ -128,9 +128,9 @@ export class GraphControls {
                 this.plugin.settings.linkForce || 0.5, (value) => {
                 this.plugin.settings.linkForce = value;
                 if (this.view.renderer) this.view.renderer.updateLinkForce(value);
-            }, async (value) => {
+            }, (value) => {
                 this.plugin.settings.linkForce = value;
-                await this.plugin.saveSettings();
+                void this.plugin.saveSettings();
             });
 
             // Link distance
@@ -138,9 +138,9 @@ export class GraphControls {
                 this.plugin.settings.linkDistance, (value) => {
                 this.plugin.settings.linkDistance = value;
                 if (this.view.renderer) this.view.renderer.updateForces();
-            }, async (value) => {
+            }, (value) => {
                 this.plugin.settings.linkDistance = value;
-                await this.plugin.saveSettings();
+                void this.plugin.saveSettings();
             });
         });
     }
@@ -159,10 +159,10 @@ export class GraphControls {
         // Helper to toggle state
         const toggleSection = (open: boolean) => {
             if (open) {
-                content.style.display = 'block';
+                content.toggleClass('is-hidden', false);
                 setIcon(chevron, 'chevron-down');
             } else {
-                content.style.display = 'none';
+                content.toggleClass('is-hidden', true);
                 setIcon(chevron, 'chevron-right');
             }
         };
@@ -174,7 +174,7 @@ export class GraphControls {
         // Use onclick to ensure it works
         header.onclick = (e) => {
             e.stopPropagation(); // Prevent bubbling issues
-            const isHidden = content.style.display === 'none';
+            const isHidden = content.hasClass('is-hidden');
             toggleSection(isHidden);
         };
         
@@ -193,11 +193,6 @@ export class GraphControls {
     private createSlider(parent: HTMLElement, label: string, min: number, max: number, step: number, 
         value: number, onInput: (value: number) => void, onChange?: (value: number) => void) {
         const container = parent.createDiv('slider-container');
-        // Force full width layout via inline styles
-        container.style.width = '100%';
-        container.style.display = 'flex';
-        container.style.flexDirection = 'column';
-        container.style.marginBottom = '12px';
 
         container.createEl('span', { text: label, cls: 'slider-label' });
         
@@ -209,10 +204,6 @@ export class GraphControls {
         slider.sliderEl.addClass('slider');
         slider.sliderEl.addClass('w-full');
         
-        // Force slider width
-        slider.sliderEl.style.width = '100%';
-        slider.sliderEl.style.display = 'block';
-
         // Handle real-time updates (dragging)
         slider.sliderEl.addEventListener('input', () => {
             onInput(slider.getValue());

@@ -76,6 +76,13 @@
     color: var(--text-normal);
 }
 
+.graph-control-actions {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+}
+
 .graph-controls-content {
     overflow-y: auto;
     overflow-x: hidden;
@@ -101,8 +108,13 @@
 }
 
 .graph-control-toggle:hover {
-    background: var(--background-modifier-hover);
+    background: linear-gradient(var(--background-modifier-hover), var(--background-modifier-hover)), var(--background-primary);
     color: var(--text-normal);
+}
+
+/* Utility Classes */
+.is-hidden {
+    display: none !important;
 }
 
 /* Control Sections */
@@ -186,6 +198,10 @@
 /* Slider */
 .slider-container {
     margin: 12px 0;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 12px;
 }
 
 .slider-label {
@@ -196,13 +212,19 @@
 }
 
 .slider {
-    width: 100%;
+    width: 100% !important;
+    display: block !important;
     height: 4px;
     -webkit-appearance: none;
     appearance: none;
     background: var(--background-modifier-border);
     border-radius: 2px;
     outline: none;
+}
+
+.w-full {
+    width: 100% !important;
+    display: block !important;
 }
 
 .slider::-webkit-slider-thumb {
