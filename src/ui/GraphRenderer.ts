@@ -276,12 +276,12 @@ export class GraphRenderer {
                 .text(d.name);
         });
 
-        this.nodeElements.on('click', async (event, d) => {
+        this.nodeElements.on('click', (event, d) => {
             event.stopPropagation();
             if (d.type !== 'tag') {
                 const file = this.plugin.app.vault.getAbstractFileByPath(d.path);
                 if (file instanceof TFile) {
-                    await this.plugin.app.workspace.getLeaf().openFile(file);
+                    void this.plugin.app.workspace.getLeaf().openFile(file);
                 }
             }
         });
@@ -807,11 +807,11 @@ export class GraphRenderer {
         });
 
         // Handle clicks
-        node.on('click', async (event, d) => {
+        node.on('click', (event, d) => {
             event.stopPropagation();
             const file = this.plugin.app.vault.getAbstractFileByPath(d.path);
             if (file instanceof TFile) {
-                await this.plugin.app.workspace.getLeaf().openFile(file);
+                void this.plugin.app.workspace.getLeaf().openFile(file);
             }
         });
 

@@ -186,6 +186,7 @@ export class EmbeddingService {
                 
                 // If quota exceeded, stop immediately
                 if (error.message && error.message.includes('429')) {
+                    // eslint-disable-next-line obsidianmd/ui/sentence-case
                     new Notice('OpenAI API quota exceeded. Please check your API key and billing at platform.openai.com.', 10000);
                     break;
                 }

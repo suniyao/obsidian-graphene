@@ -16,7 +16,7 @@ export class BetterGraphModal extends Modal {
         this.plugin = plugin;
     }
 
-    async onOpen() {
+    onOpen() {
         const { contentEl } = this;
         contentEl.empty();
         contentEl.addClass('better-graph-view');
@@ -88,7 +88,7 @@ export class BetterGraphModal extends Modal {
             slider.oninput = (e) => {
                 const newThickness = parseFloat((e.target as HTMLInputElement).value);
                 this.plugin.settings.linkThickness[linkId] = newThickness;
-                this.plugin.saveSettings();
+                void this.plugin.saveSettings();
                 value.textContent = newThickness.toString();
                 this.updateLinkThickness(newThickness);
             };
@@ -266,7 +266,7 @@ export class BetterGraphModal extends Modal {
             event.stopPropagation();
             const file = this.app.vault.getAbstractFileByPath(d.path);
             if (file instanceof TFile) {
-                this.app.workspace.getLeaf().openFile(file);
+                void this.app.workspace.getLeaf().openFile(file);
                 this.close();
             }
         });
