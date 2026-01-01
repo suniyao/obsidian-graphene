@@ -272,8 +272,7 @@ updateEmbeddingStatusUI(): void {
         // Check provider configuration
         const provider = this.settings.embeddingProvider || 'ollama';
         if (provider === 'openai' && !this.settings.openaiApiKey) {
-            // eslint-disable-next-line obsidianmd/ui/sentence-case
-            new Notice('Please configure OpenAI API key in settings first.'); // /skip
+            new Notice('Please configure the OpenAI API key in settings first.'); 
             return;
         }
 

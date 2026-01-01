@@ -1,4 +1,3 @@
-/* eslint-disable obsidianmd/ui/sentence-case */
 import { App, PluginSettingTab, Setting, Notice } from 'obsidian';
 import type CombinedPlugin from '../main';
 import { BetterGraphView, VIEW_TYPE_GRAPH } from './GraphView';
