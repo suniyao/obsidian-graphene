@@ -61,8 +61,8 @@ Ollama runs entirely on your machine with no API costs.
 ## Usage
 
 ### Opening the Graph
-- Click the **Graphene View** icon (network dots) in the left ribbon.
-- Or use the Command Palette (`Cmd/Ctrl + P`) and search for **"Graphene: Open Graphene View"**.
+- Click the **Graphene view** icon (network dots) in the left ribbon.
+- Or use the Command Palette (`Cmd/Ctrl + P`) and search for **"Graphene: Open graph view"**.
 
 ### Controls
 The control panel on the right allows you to customize the graph:
@@ -75,15 +75,15 @@ The control panel on the right allows you to customize the graph:
 
 ### Generating Embeddings
 
-- Go to the plugin settings to see the **Embedding Status**.
+- Go to the plugin settings to see the **Embedding status**.
 - It tracks which files are new, modified, or up-to-date.
-- Click **Update Embeddings** to process only the changed files.
+- Click **Update embeddings** to process only the changed files.
 
 **Tips:**
-- If you have a fixed style of notes (e.g., meeting notes), consider using the **Skip Initial Words** and **Exclude Headings** settings to prevent correlation based on template similarity.
-- If you have a large vault, adjust the **Word Limit for Embeddings** to reduce token usage and speed up embedding generation.
+- If you have a fixed style of notes (e.g., meeting notes), consider using the **Skip initial words** and **Exclude headings from embedding** settings to prevent correlation based on template similarity.
+- If you have a large vault, adjust the **Word limit for embeddings** to reduce token usage and speed up embedding generation.
 
-> **Troubleshooting**: To clear all embeddings when encountering issues, use the **Clear All Embeddings** button in settings.
+> **Troubleshooting**: To clear all embeddings when encountering issues, use the **Clear all embeddings** button in settings.
 
 ## Development
 
