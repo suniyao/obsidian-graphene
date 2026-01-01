@@ -181,36 +181,7 @@
     color: var(--text-normal);
 }
 
-.checkbox-container {
-    width: 40px;
-    height: 20px;
-    background: var(--background-modifier-border);
-    border-radius: 10px;
-    position: relative;
-    cursor: pointer;
-    transition: background 0.2s;
-    flex-shrink: 0;
-}
 
-.checkbox-container::after {
-    content: '';
-    position: absolute;
-    width: 16px;
-    height: 16px;
-    background: white;
-    border-radius: 50%;
-    top: 2px;
-    left: 2px;
-    transition: transform 0.2s;
-}
-
-.checkbox-container.is-enabled {
-    background: var(--interactive-accent);
-}
-
-.checkbox-container.is-enabled::after {
-    transform: translateX(20px);
-}
 
 /* Slider */
 .slider-container {

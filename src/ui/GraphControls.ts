@@ -1,4 +1,4 @@
-import { setIcon, SliderComponent } from 'obsidian';
+import { setIcon, SliderComponent, ToggleComponent } from 'obsidian';
 import type CombinedPlugin from '../main';
 import type { BetterGraphView } from './GraphView';
 
@@ -185,14 +185,9 @@ export class GraphControls {
         const container = parent.createDiv('toggle-container');
         container.createEl('span', { text: label });
         
-        const toggle = container.createDiv('checkbox-container');
-        toggle.classList.toggle('is-enabled', checked);
-        
-        toggle.addEventListener('click', () => {
-            const newValue = !toggle.classList.contains('is-enabled');
-            toggle.classList.toggle('is-enabled', newValue);
-            onChange(newValue);
-        });
+        new ToggleComponent(container)
+            .setValue(checked)
+            .onChange(onChange);
     }
 
     private createSlider(parent: HTMLElement, label: string, min: number, max: number, step: number, 
