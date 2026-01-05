@@ -26,7 +26,7 @@ Graphene transforms your Obsidian vault into an interactive, semantic knowledge 
 1. Clone this repo to your vault's `.obsidian/plugin/` directory.
 2. Reload Obsidian and enable **Graphene** in Community Plugins.
 
-> This plugin is yet not featured in Obsidian [plugin directory](https://obsidian.md/plugins), but we are actively working on it!
+> This plugin is yet not featured in Obsidian [plugin directory](https://obsidian.md/plugins), but we are actively working on it (and waiting for the queue to be reviewed)!
 
 ## Setup & Configuration
 
