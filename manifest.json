@@ -1,7 +1,7 @@
 {
 	"id": "graphene",
 	"name": "Graphene",
-	"version": "1.2.1",
+	"version": "1.2.2",
 	"minAppVersion": "0.15.0",
 	"description": "Creates a semantic graph based on content similarity using vector embeddings.",
 	"author": "Steph Yao",
