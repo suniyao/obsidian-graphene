@@ -915,6 +915,111 @@ export class GraphRenderer {
             .attr('marker-end', showArrows ? 'url(#arrow)' : null);
     }
 
+    async searchFileContents(searchTerm: string) {
+        if (!searchTerm || searchTerm.trim() === '') {
+            // Clear search - restore all nodes
+            this.nodes.forEach(node => {
+                node.fx = null;
+                node.fy = null;
+            });
+            
+            this.nodeElements
+                .transition()
+                .duration(300)
+                .attr('opacity', d => {
+                    if (d.type === 'tag' && !this.plugin.settings.showTags) return 0;
+                    return 1;
+                })
+                .style('pointer-events', 'all');
+            
+            this.linkElements
+                .transition()
+                .duration(300)
+                .attr('opacity', d => {
+                    if (d.type === 'tag-link' && !this.plugin.settings.showTags) return 0;
+                    return 1;
+                });
+            
+            this.simulation.alpha(0.3).restart();
+            return;
+        }
+        
+        const term = searchTerm.toLowerCase();
+        const matchingNodeIds = new Set<string>();
+        
+        // Search through all file nodes
+        for (const node of this.nodes) {
+            if (node.type === 'file' || !node.type) {
+                const file = this.plugin.app.vault.getAbstractFileByPath(node.path);
+                if (file instanceof TFile) {
+                    try {
+                        const content = await this.plugin.app.vault.cachedRead(file);
+                        if (content.toLowerCase().includes(term)) {
+                            matchingNodeIds.add(node.id);
+                        }
+                    } catch (error) {
+                        console.error('Error reading file:', node.path, error);
+                    }
+                }
+            } else if (node.type === 'tag') {
+                // Include tags if they match the search term or are connected to matching files
+                if (node.name.toLowerCase().includes(term)) {
+                    matchingNodeIds.add(node.id);
+                }
+            }
+        }
+        
+        // Include tags that are connected to matching files
+        this.links.forEach(link => {
+            const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
+            const targetId = typeof link.target === 'string' ? link.target : link.target.id;
+            
+            if (link.type === 'tag-link') {
+                const sourceNode = this.nodes.find(n => n.id === sourceId);
+                const targetNode = this.nodes.find(n => n.id === targetId);
+                
+                if (sourceNode?.type === 'tag' && matchingNodeIds.has(targetId)) {
+                    matchingNodeIds.add(sourceId);
+                } else if (targetNode?.type === 'tag' && matchingNodeIds.has(sourceId)) {
+                    matchingNodeIds.add(targetId);
+                }
+            }
+        });
+        
+        // Update node visibility and forces
+        this.nodes.forEach(node => {
+            if (!matchingNodeIds.has(node.id)) {
+                // Freeze non-matching nodes at their current position
+                node.fx = node.x;
+                node.fy = node.y;
+            } else {
+                // Allow matching nodes to move freely
+                node.fx = null;
+                node.fy = null;
+            }
+        });
+        
+        // Update node opacity
+        this.nodeElements
+            .transition()
+            .duration(300)
+            .attr('opacity', d => matchingNodeIds.has(d.id) ? 1 : 0)
+            .style('pointer-events', d => matchingNodeIds.has(d.id) ? 'all' : 'none');
+        
+        // Update link opacity - only show links between matching nodes
+        this.linkElements
+            .transition()
+            .duration(300)
+            .attr('opacity', d => {
+                const sourceId = typeof d.source === 'string' ? d.source : d.source.id;
+                const targetId = typeof d.target === 'string' ? d.target : d.target.id;
+                return (matchingNodeIds.has(sourceId) && matchingNodeIds.has(targetId)) ? 1 : 0;
+            });
+        
+        // Restart simulation to reorganize matching nodes
+        this.simulation.alpha(0.3).restart();
+    }
+
     setTextFadeThreshold(normalizedThreshold: number) {
         // Implement smooth text fading based on zoom level
         // Convert normalized threshold (-3 to 3) to actual zoom level

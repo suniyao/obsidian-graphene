@@ -17,6 +17,9 @@ export class GraphControls {
     private render() {
         this.container.empty();
 
+        // Search Section
+        this.createSearchSection();
+
         // Display Section
         this.createSection('Display', (content) => {
             this.createToggle(content, 'Tags', this.plugin.settings.showTags, (enabled) => {
@@ -142,6 +145,34 @@ export class GraphControls {
                 this.plugin.settings.linkDistance = value;
                 void this.plugin.saveSettings();
             });
+        });
+    }
+
+    private createSearchSection() {
+        const section = this.container.createDiv('search-section');
+        const container = section.createDiv('search-container');
+        
+        // Add search icon
+        const searchIcon = container.createDiv('search-icon');
+        setIcon(searchIcon, 'search');
+        
+        const searchInput = container.createEl('input', {
+            type: 'text',
+            placeholder: 'Search in file contents...',
+            cls: 'search-input'
+        });
+        
+        let debounceTimer: NodeJS.Timeout;
+        searchInput.addEventListener('input', (e) => {
+            const searchTerm = (e.target as HTMLInputElement).value.toLowerCase();
+            
+            // Debounce the search to avoid excessive file reads
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                if (this.view.renderer) {
+                    void this.view.renderer.searchFileContents(searchTerm);
+                }
+            }, 300);
         });
     }
 
