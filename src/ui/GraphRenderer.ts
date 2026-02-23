@@ -24,6 +24,8 @@ export class GraphRenderer {
     private showArrows: boolean = false;
     private highlightedEdges: Set<string> = new Set();
     private maxTagConnectionCount: number = 1;
+    private isSearching: boolean = false;
+    private matchingNodeIds: Set<string> = new Set();
 
     private calculateMaxConnections() {
         this.maxTagConnectionCount = 0;
@@ -110,6 +112,10 @@ export class GraphRenderer {
             return;
         }
         
+        // Clear search state when data updates
+        this.isSearching = false;
+        this.matchingNodeIds.clear();
+        
         this.nodes = nodes;
         this.links = links;
         this.calculateMaxConnections();
@@ -124,6 +130,9 @@ export class GraphRenderer {
         // Update visual elements
         this.setupLinks();
         this.setupNodes();
+        
+        // Update forces to ensure they match the new state
+        this.updateForces();
         
         // Restart simulation
         this.simulation.alpha(0.3).restart();
@@ -634,6 +643,11 @@ export class GraphRenderer {
                     return this.plugin.settings.linkDistance * 1.2;
                 })
                 .strength((d) => {
+                    if (this.isSearching) {
+                        const s = d.source as GraphNode;
+                        const t = d.target as GraphNode;
+                        if (!this.matchingNodeIds.has(s.id) || !this.matchingNodeIds.has(t.id)) return 0;
+                    }
                     if (!this.plugin.settings.showTags) {
                         const s = d.source as GraphNode;
                         const t = d.target as GraphNode;
@@ -643,23 +657,27 @@ export class GraphRenderer {
                 })) // Much weaker link force to allow natural scattering
             .force('charge', d3.forceManyBody()
                 .strength((d: GraphNode) => {
+                    if (this.isSearching && !this.matchingNodeIds.has(d.id)) return 0;
                     if (d.type === 'tag' && !this.plugin.settings.showTags) return 0;
                     return -this.plugin.settings.repulsionForce * 0.8;
                 })
                 .distanceMax(targetRadius * 1.5)) // Scale repulsion distance with target radius
             .force('radial', d3.forceRadial(targetRadius, centerX, centerY)
-                .strength(0.05)) // Gentle radial force to create circular boundary
+                .radius((d: GraphNode) => {
+                    if (this.isSearching && this.matchingNodeIds.has(d.id)) {
+                        return targetRadius * 0.4;
+                    }
+                    return targetRadius;
+                })
+                .strength((d: GraphNode) => {
+                    if (this.isSearching && !this.matchingNodeIds.has(d.id)) return 0;
+                    return this.isSearching ? 0.1 : 0.05;
+                })) // Gentle radial force to create circular boundary
             .force('collision', d3.forceCollide()
                 .radius((d: GraphNode) => {
+                    if (this.isSearching && !this.matchingNodeIds.has(d.id)) return 0;
                     if (d.type === 'tag' && !this.plugin.settings.showTags) return 0;
-
-                    if (d.type === 'tag' && d.connectionCount) {
-                        const minSize = this.plugin.settings.nodeSize * 0.8;
-                        const maxSize = this.plugin.settings.nodeSize * 2;
-                        const scaleFactor = Math.log(d.connectionCount + 1) / Math.log(10);
-                        return Math.min(maxSize, minSize + scaleFactor * 10) + 4;
-                    }
-                    return this.plugin.settings.nodeSize + 4;
+                    return this.getNodeRadius(d) + 4;
                 })
                 .strength(0.7)
                 .iterations(2))
@@ -690,6 +708,7 @@ export class GraphRenderer {
             // Update charge force
             (this.simulation.force('charge') as d3.ForceManyBody<GraphNode>)
                 ?.strength((d: GraphNode) => {
+                    if (this.isSearching && !this.matchingNodeIds.has(d.id)) return 0;
                     if (d.type === 'tag' && !this.plugin.settings.showTags) return 0;
                     return -this.plugin.settings.repulsionForce * 0.8;
                 })
@@ -704,6 +723,11 @@ export class GraphRenderer {
                     return this.plugin.settings.linkDistance * 1.2;
                 })
                 ?.strength((d) => {
+                    if (this.isSearching) {
+                        const s = d.source as GraphNode;
+                        const t = d.target as GraphNode;
+                        if (!this.matchingNodeIds.has(s.id) || !this.matchingNodeIds.has(t.id)) return 0;
+                    }
                     if (!this.plugin.settings.showTags) {
                         const s = d.source as GraphNode;
                         const t = d.target as GraphNode;
@@ -714,14 +738,24 @@ export class GraphRenderer {
             
             // Update radial force with new radius - this controls tight vs loose circle
             (this.simulation.force('radial') as d3.ForceRadial<GraphNode>)
-                ?.radius(targetRadius)
+                ?.radius((d: GraphNode) => {
+                    if (this.isSearching && this.matchingNodeIds.has(d.id)) {
+                        // Pull matching nodes into a tighter circle
+                        return targetRadius * 0.4;
+                    }
+                    return targetRadius;
+                })
                 ?.x(centerX)
                 ?.y(centerY)
-                ?.strength(0.05);
+                ?.strength((d: GraphNode) => {
+                    if (this.isSearching && !this.matchingNodeIds.has(d.id)) return 0;
+                    return this.isSearching ? 0.1 : 0.05;
+                });
 
             // Update collision force
             (this.simulation.force('collision') as d3.ForceCollide<GraphNode>)
                 ?.radius((d: GraphNode) => {
+                    if (this.isSearching && !this.matchingNodeIds.has(d.id)) return 0;
                     if (d.type === 'tag' && !this.plugin.settings.showTags) return 0;
                     return this.getNodeRadius(d) + 4;
                 });
@@ -915,6 +949,117 @@ export class GraphRenderer {
             .attr('marker-end', showArrows ? 'url(#arrow)' : null);
     }
 
+    async searchFileContents(searchTerm: string) {
+        if (!searchTerm || searchTerm.trim() === '') {
+            this.isSearching = false;
+            this.matchingNodeIds.clear();
+            
+            // Clear search - restore all nodes
+            this.nodes.forEach(node => {
+                node.fx = null;
+                node.fy = null;
+            });
+            
+            this.nodeElements
+                .transition()
+                .duration(300)
+                .attr('opacity', d => {
+                    if (d.type === 'tag' && !this.plugin.settings.showTags) return 0;
+                    return 1;
+                })
+                .style('pointer-events', 'all');
+            
+            this.linkElements
+                .transition()
+                .duration(300)
+                .attr('opacity', d => {
+                    if (d.type === 'tag-link' && !this.plugin.settings.showTags) return 0;
+                    return 1;
+                });
+            
+            this.updateForces();
+            return;
+        }
+        
+        const term = searchTerm.toLowerCase();
+        const matchingNodeIds = new Set<string>();
+        
+        // Search through all file nodes
+        for (const node of this.nodes) {
+            if (node.type === 'file' || !node.type) {
+                const file = this.plugin.app.vault.getAbstractFileByPath(node.path);
+                if (file instanceof TFile) {
+                    try {
+                        const content = await this.plugin.app.vault.cachedRead(file);
+                        if (content.toLowerCase().includes(term)) {
+                            matchingNodeIds.add(node.id);
+                        }
+                    } catch (error) {
+                        console.error('Error reading file:', node.path, error);
+                    }
+                }
+            } else if (node.type === 'tag') {
+                // Include tags if they match the search term or are connected to matching files
+                if (node.name.toLowerCase().includes(term)) {
+                    matchingNodeIds.add(node.id);
+                }
+            }
+        }
+        
+        // Include tags that are connected to matching files
+        this.links.forEach(link => {
+            const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
+            const targetId = typeof link.target === 'string' ? link.target : link.target.id;
+            
+            if (link.type === 'tag-link') {
+                const sourceNode = this.nodes.find(n => n.id === sourceId);
+                const targetNode = this.nodes.find(n => n.id === targetId);
+                
+                if (sourceNode?.type === 'tag' && matchingNodeIds.has(targetId)) {
+                    matchingNodeIds.add(sourceId);
+                } else if (targetNode?.type === 'tag' && matchingNodeIds.has(sourceId)) {
+                    matchingNodeIds.add(targetId);
+                }
+            }
+        });
+        
+        // Update node visibility and forces
+        this.isSearching = true;
+        this.matchingNodeIds = matchingNodeIds;
+        
+        this.nodes.forEach(node => {
+            if (!matchingNodeIds.has(node.id)) {
+                // Freeze non-matching nodes at their current position
+                node.fx = node.x;
+                node.fy = node.y;
+            } else {
+                // Allow matching nodes to move freely
+                node.fx = null;
+                node.fy = null;
+            }
+        });
+        
+        // Update node opacity
+        this.nodeElements
+            .transition()
+            .duration(300)
+            .attr('opacity', d => matchingNodeIds.has(d.id) ? 1 : 0)
+            .style('pointer-events', d => matchingNodeIds.has(d.id) ? 'all' : 'none');
+        
+        // Update link opacity - only show links between matching nodes
+        this.linkElements
+            .transition()
+            .duration(300)
+            .attr('opacity', d => {
+                const sourceId = typeof d.source === 'string' ? d.source : d.source.id;
+                const targetId = typeof d.target === 'string' ? d.target : d.target.id;
+                return (matchingNodeIds.has(sourceId) && matchingNodeIds.has(targetId)) ? 1 : 0;
+            });
+        
+        // Update forces to reorganize matching nodes into a circle
+        this.updateForces();
+    }
+
     setTextFadeThreshold(normalizedThreshold: number) {
         // Implement smooth text fading based on zoom level
         // Convert normalized threshold (-3 to 3) to actual zoom level
@@ -947,6 +1092,7 @@ export class GraphRenderer {
         if (this.simulation) {
             (this.simulation.force('collision') as d3.ForceCollide<GraphNode>)
                 ?.radius(d => {
+                    if (this.isSearching && !this.matchingNodeIds.has(d.id)) return 0;
                     if (d.type === 'tag' && !this.plugin.settings.showTags) return 0;
                     return this.getNodeRadius(d) + 4;
                 });
