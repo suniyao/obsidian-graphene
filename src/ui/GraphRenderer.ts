@@ -24,6 +24,8 @@ export class GraphRenderer {
     private showArrows: boolean = false;
     private highlightedEdges: Set<string> = new Set();
     private maxTagConnectionCount: number = 1;
+    private isSearching: boolean = false;
+    private matchingNodeIds: Set<string> = new Set();
 
     private calculateMaxConnections() {
         this.maxTagConnectionCount = 0;
@@ -110,6 +112,10 @@ export class GraphRenderer {
             return;
         }
         
+        // Clear search state when data updates
+        this.isSearching = false;
+        this.matchingNodeIds.clear();
+        
         this.nodes = nodes;
         this.links = links;
         this.calculateMaxConnections();
@@ -124,6 +130,9 @@ export class GraphRenderer {
         // Update visual elements
         this.setupLinks();
         this.setupNodes();
+        
+        // Update forces to ensure they match the new state
+        this.updateForces();
         
         // Restart simulation
         this.simulation.alpha(0.3).restart();
@@ -634,6 +643,11 @@ export class GraphRenderer {
                     return this.plugin.settings.linkDistance * 1.2;
                 })
                 .strength((d) => {
+                    if (this.isSearching) {
+                        const s = d.source as GraphNode;
+                        const t = d.target as GraphNode;
+                        if (!this.matchingNodeIds.has(s.id) || !this.matchingNodeIds.has(t.id)) return 0;
+                    }
                     if (!this.plugin.settings.showTags) {
                         const s = d.source as GraphNode;
                         const t = d.target as GraphNode;
@@ -643,23 +657,27 @@ export class GraphRenderer {
                 })) // Much weaker link force to allow natural scattering
             .force('charge', d3.forceManyBody()
                 .strength((d: GraphNode) => {
+                    if (this.isSearching && !this.matchingNodeIds.has(d.id)) return 0;
                     if (d.type === 'tag' && !this.plugin.settings.showTags) return 0;
                     return -this.plugin.settings.repulsionForce * 0.8;
                 })
                 .distanceMax(targetRadius * 1.5)) // Scale repulsion distance with target radius
             .force('radial', d3.forceRadial(targetRadius, centerX, centerY)
-                .strength(0.05)) // Gentle radial force to create circular boundary
+                .radius((d: GraphNode) => {
+                    if (this.isSearching && this.matchingNodeIds.has(d.id)) {
+                        return targetRadius * 0.4;
+                    }
+                    return targetRadius;
+                })
+                .strength((d: GraphNode) => {
+                    if (this.isSearching && !this.matchingNodeIds.has(d.id)) return 0;
+                    return this.isSearching ? 0.1 : 0.05;
+                })) // Gentle radial force to create circular boundary
             .force('collision', d3.forceCollide()
                 .radius((d: GraphNode) => {
+                    if (this.isSearching && !this.matchingNodeIds.has(d.id)) return 0;
                     if (d.type === 'tag' && !this.plugin.settings.showTags) return 0;
-
-                    if (d.type === 'tag' && d.connectionCount) {
-                        const minSize = this.plugin.settings.nodeSize * 0.8;
-                        const maxSize = this.plugin.settings.nodeSize * 2;
-                        const scaleFactor = Math.log(d.connectionCount + 1) / Math.log(10);
-                        return Math.min(maxSize, minSize + scaleFactor * 10) + 4;
-                    }
-                    return this.plugin.settings.nodeSize + 4;
+                    return this.getNodeRadius(d) + 4;
                 })
                 .strength(0.7)
                 .iterations(2))
@@ -690,6 +708,7 @@ export class GraphRenderer {
             // Update charge force
             (this.simulation.force('charge') as d3.ForceManyBody<GraphNode>)
                 ?.strength((d: GraphNode) => {
+                    if (this.isSearching && !this.matchingNodeIds.has(d.id)) return 0;
                     if (d.type === 'tag' && !this.plugin.settings.showTags) return 0;
                     return -this.plugin.settings.repulsionForce * 0.8;
                 })
@@ -704,6 +723,11 @@ export class GraphRenderer {
                     return this.plugin.settings.linkDistance * 1.2;
                 })
                 ?.strength((d) => {
+                    if (this.isSearching) {
+                        const s = d.source as GraphNode;
+                        const t = d.target as GraphNode;
+                        if (!this.matchingNodeIds.has(s.id) || !this.matchingNodeIds.has(t.id)) return 0;
+                    }
                     if (!this.plugin.settings.showTags) {
                         const s = d.source as GraphNode;
                         const t = d.target as GraphNode;
@@ -714,14 +738,24 @@ export class GraphRenderer {
             
             // Update radial force with new radius - this controls tight vs loose circle
             (this.simulation.force('radial') as d3.ForceRadial<GraphNode>)
-                ?.radius(targetRadius)
+                ?.radius((d: GraphNode) => {
+                    if (this.isSearching && this.matchingNodeIds.has(d.id)) {
+                        // Pull matching nodes into a tighter circle
+                        return targetRadius * 0.4;
+                    }
+                    return targetRadius;
+                })
                 ?.x(centerX)
                 ?.y(centerY)
-                ?.strength(0.05);
+                ?.strength((d: GraphNode) => {
+                    if (this.isSearching && !this.matchingNodeIds.has(d.id)) return 0;
+                    return this.isSearching ? 0.1 : 0.05;
+                });
 
             // Update collision force
             (this.simulation.force('collision') as d3.ForceCollide<GraphNode>)
                 ?.radius((d: GraphNode) => {
+                    if (this.isSearching && !this.matchingNodeIds.has(d.id)) return 0;
                     if (d.type === 'tag' && !this.plugin.settings.showTags) return 0;
                     return this.getNodeRadius(d) + 4;
                 });
@@ -917,6 +951,9 @@ export class GraphRenderer {
 
     async searchFileContents(searchTerm: string) {
         if (!searchTerm || searchTerm.trim() === '') {
+            this.isSearching = false;
+            this.matchingNodeIds.clear();
+            
             // Clear search - restore all nodes
             this.nodes.forEach(node => {
                 node.fx = null;
@@ -940,7 +977,7 @@ export class GraphRenderer {
                     return 1;
                 });
             
-            this.simulation.alpha(0.3).restart();
+            this.updateForces();
             return;
         }
         
@@ -987,6 +1024,9 @@ export class GraphRenderer {
         });
         
         // Update node visibility and forces
+        this.isSearching = true;
+        this.matchingNodeIds = matchingNodeIds;
+        
         this.nodes.forEach(node => {
             if (!matchingNodeIds.has(node.id)) {
                 // Freeze non-matching nodes at their current position
@@ -1016,8 +1056,8 @@ export class GraphRenderer {
                 return (matchingNodeIds.has(sourceId) && matchingNodeIds.has(targetId)) ? 1 : 0;
             });
         
-        // Restart simulation to reorganize matching nodes
-        this.simulation.alpha(0.3).restart();
+        // Update forces to reorganize matching nodes into a circle
+        this.updateForces();
     }
 
     setTextFadeThreshold(normalizedThreshold: number) {
@@ -1052,6 +1092,7 @@ export class GraphRenderer {
         if (this.simulation) {
             (this.simulation.force('collision') as d3.ForceCollide<GraphNode>)
                 ?.radius(d => {
+                    if (this.isSearching && !this.matchingNodeIds.has(d.id)) return 0;
                     if (d.type === 'tag' && !this.plugin.settings.showTags) return 0;
                     return this.getNodeRadius(d) + 4;
                 });
