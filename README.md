@@ -1,5 +1,4 @@
 # Graphene - A Semantic Graph View for Obsidian Based on Content Similarity Using Vector Embeddings
-prototype by [suniyao](https://github.com/suniyao/) and [sanika-n](https://github.com/sanika-n) at [pair](https://pair.camp/)
 
 <p align="center">
   <img width="406" height="422" alt="Graphene semantic view" src="https://github.com/user-attachments/assets/035d31ba-1ab3-473b-8f91-8ee66679495b" />
@@ -107,3 +106,6 @@ For hot reloading during development, install [Hot Reload](https://github.com/pj
 ## License
 
 [GPL-3.0](LICENSE)
+
+## Contribution
+prototype by [suniyao](https://github.com/suniyao/) and [sanika-n](https://github.com/sanika-n) at [pair](https://pair.camp/) :)
