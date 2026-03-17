@@ -108,4 +108,4 @@ For hot reloading during development, install [Hot Reload](https://github.com/pj
 [GPL-3.0](LICENSE)
 
 ## Contribution
-prototype by [suniyao](https://github.com/suniyao/) and [sanika-n](https://github.com/sanika-n) at [pair](https://pair.camp/) :)
+prototype by [suniyao](https://github.com/suniyao/) and [sanika-n](https://github.com/sanika-n) at [pair '25](https://pair.camp/) :) ❤️
