@@ -3,8 +3,14 @@ import { TFile } from 'obsidian';
 import type { BetterGraphView } from './GraphView';
 import { GraphNode, GraphLink } from '../types';
 import CombinedPlugin from '../main';
+import { configureLayout, prepareLayout } from './GraphLayout';
+import { matchesGraphFilters, visibleDegrees } from './GraphFilters';
+import { MIN_ZOOM, MAX_ZOOM, nodeScale, nodeRadius, labelOpacity, wheelZoom } from './GraphAppearance';
+
+let nextRendererId = 0;
 
 export class GraphRenderer {
+    private readonly arrowId = `graphene-arrow-${nextRendererId++}`;
     private container: HTMLElement;
     private plugin: CombinedPlugin;
     private view: BetterGraphView;
@@ -12,8 +18,6 @@ export class GraphRenderer {
     private g: d3.Selection<SVGGElement, unknown, null, undefined>;
     private linksGroup: d3.Selection<SVGGElement, unknown, null, undefined>;
     private nodesGroup: d3.Selection<SVGGElement, unknown, null, undefined>;
-    private dimmingLayer: d3.Selection<SVGRectElement, unknown, null, undefined>;
-    private highlightedGroup: d3.Selection<SVGGElement, unknown, null, undefined>;
     private simulation: d3.Simulation<GraphNode, GraphLink>;
     private nodes: GraphNode[] = [];
     private links: GraphLink[] = [];
@@ -22,44 +26,35 @@ export class GraphRenderer {
     private zoom: d3.ZoomBehavior<SVGSVGElement, unknown>;
     private isAnimating: boolean = true;
     private showArrows: boolean = false;
-    private highlightedEdges: Set<string> = new Set();
-    private maxTagConnectionCount: number = 1;
-    private isSearching: boolean = false;
-    private matchingNodeIds: Set<string> = new Set();
+    private isSearching = false;
+    private matchingNodeIds = new Set<string>();
+    private degrees = new Map<string, number>();
+    private hoveredNodeId: string | null = null;
+    private hoveredNeighbors = new Set<string>();
+    private zoomFrame: number | null = null;
+    private targetZoom = 1;
+    private searchVersion = 0;
+    private searchTerm = '';
+    private resizeObserver: ResizeObserver;
 
-    private calculateMaxConnections() {
-        this.maxTagConnectionCount = 0;
-        for (const node of this.nodes) {
-            if (node.type === 'tag' && node.connectionCount) {
-                this.maxTagConnectionCount = Math.max(this.maxTagConnectionCount, node.connectionCount);
-            }
-        }
-        if (this.maxTagConnectionCount === 0) this.maxTagConnectionCount = 1;
+    private matchesFilters(node: GraphNode) {
+        return matchesGraphFilters(node, this.plugin.settings, this.isSearching ? this.matchingNodeIds : null);
     }
 
-    // Compute the visual radius of a node, mirroring circle rendering logic
+    private calculateDegrees() {
+        this.degrees = visibleDegrees(this.links, node => this.matchesFilters(node));
+    }
+
     private getNodeRadius(node: GraphNode): number {
-        if (node.type === 'tag') {
-            if (node.connectionCount) {
-                const minSize = this.plugin.settings.nodeSize * 0.8;
-                const maxSize = this.plugin.settings.nodeSize * 3;
-                
-                // Use square root scaling relative to the maximum connection count
-                // This provides better differentiation than log scale while preventing
-                // extreme outliers from dominating too much (like linear would)
-                const ratio = Math.sqrt(node.connectionCount) / Math.sqrt(this.maxTagConnectionCount);
-                
-                return minSize + ratio * (maxSize - minSize);
-            }
-            return this.plugin.settings.nodeSize * 0.8;
-        }
-        return this.plugin.settings.nodeSize;
+        // Keep stored pixel settings compatible; the panel exposes native multipliers.
+        return nodeRadius(this.degrees.get(node.id) ?? 0, this.plugin.settings.nodeSize / 6);
     }
 
     constructor(container: HTMLElement, plugin: CombinedPlugin, view: BetterGraphView) {
         this.container = container;
         this.plugin = plugin;
         this.view = view;
+        this.showArrows = plugin.settings.showArrows;
     }
 
     isInitialized: boolean = false;
@@ -68,12 +63,14 @@ export class GraphRenderer {
 
     private startParticleAnimation() {
         if (this.particleAnimationTimer) this.particleAnimationTimer.stop();
+        this.particleAnimationTimer = null;
         
+        const particles = this.linkElements.selectAll<SVGLineElement, GraphLink>('line.similarity-link');
+        if (particles.empty()) return;
         this.particleAnimationTimer = d3.timer((elapsed) => {
             if (!this.isInitialized) return;
             
-            this.linkElements.selectAll('line.similarity-link')
-                .style('stroke-dashoffset', function(d: GraphLink) {
+            particles.style('stroke-dashoffset', function(d: GraphLink) {
                     const sim = d.similarity || 0;
                     // Speed factor. 
                     // Higher sim -> faster.
@@ -87,8 +84,8 @@ export class GraphRenderer {
 
     initialize(nodes: GraphNode[], links: GraphLink[]) {
         this.nodes = nodes;
-        this.links = links;
-        this.calculateMaxConnections();
+        this.links = prepareLayout(nodes, links, [], (this.container.clientWidth || 800) / 2, (this.container.clientHeight || 600) / 2);
+        this.calculateDegrees();
         
         // Clear any existing content
         d3.select(this.container).selectAll('*').remove();
@@ -100,7 +97,12 @@ export class GraphRenderer {
         this.setupNodes();
         this.setupZoom();
         
-        this.isInitialized = true;  // Set the flag
+        this.ticked();
+        this.setTextFadeThreshold(this.plugin.settings.textFadeThreshold ?? 0);
+        this.isInitialized = true;
+        this.applyNodeVisibility();
+        this.resizeObserver = new ResizeObserver(() => this.resize());
+        this.resizeObserver.observe(this.container);
         if (this.plugin.settings.showParticleAnimation !== false) {
             this.startParticleAnimation();
         }
@@ -112,30 +114,23 @@ export class GraphRenderer {
             return;
         }
         
+        this.searchVersion++;
         // Clear search state when data updates
         this.isSearching = false;
         this.matchingNodeIds.clear();
         
+        this.links = prepareLayout(nodes, links, this.nodes, (this.container.clientWidth || 800) / 2, (this.container.clientHeight || 600) / 2);
         this.nodes = nodes;
-        this.links = links;
-        this.calculateMaxConnections();
-        
-        // Update simulation
-        this.simulation.nodes(this.nodes);
-        const linkForce = this.simulation.force('link') as d3.ForceLink<GraphNode, GraphLink>;
-        if (linkForce) {
-            linkForce.links(this.links);
-        }
-        
-        // Update visual elements
+        this.calculateDegrees();
+        this.hoveredNodeId = null;
+        this.hoveredNeighbors.clear();
         this.setupLinks();
         this.setupNodes();
-        
-        // Update forces to ensure they match the new state
         this.updateForces();
-        
-        // Restart simulation
-        this.simulation.alpha(0.3).restart();
+        this.ticked();
+        this.setTextFadeThreshold(this.plugin.settings.textFadeThreshold ?? 0);
+        this.applyNodeVisibility();
+        if (this.searchTerm) void this.searchFileContents(this.searchTerm);
     }
 
 
@@ -144,52 +139,29 @@ export class GraphRenderer {
         const defs = this.svg.append('defs');
         
         defs.append('marker')
-            .attr('id', 'arrow')
-            .attr('viewBox', '0 -5 10 10')
-            .attr('refX', 10)  // Position tip at end of line
-            .attr('refY', 0)
-            .attr('markerWidth', 4)
-            .attr('markerHeight', 4)
-            .attr('orient', 'auto')
-            .append('path')
-            .attr('fill', 'var(--text-muted)')
-            .attr('d', 'M0,-3L10,0L0,3Q1.5,0 0,-3Z');  // Acute arrow with concave curved base
-
-        defs.append('marker')
-            .attr('id', 'arrow-accent')
-            .attr('viewBox', '0 -5 10 10')
-            .attr('refX', 10)  // Position tip at end of line
-            .attr('refY', 0)
-            .attr('markerWidth', 4)
-            .attr('markerHeight', 4)
-            .attr('orient', 'auto')
-            .append('path')
-            .attr('fill', 'var(--interactive-accent)')
-            .attr('d', 'M0,-3L10,0L0,3Q1.5,0 0,-3Z');  // Acute arrow with concave curved base
+            .attr('id', this.arrowId).attr('viewBox', '0 -5 10 10')
+            .attr('refX', 10).attr('refY', 0).attr('markerWidth', 4).attr('markerHeight', 4)
+            .attr('orient', 'auto').attr('markerUnits', 'userSpaceOnUse')
+            .append('path').attr('fill', 'var(--graph-line, var(--text-muted))')
+            .attr('d', 'M0,-3L10,0L0,3Z');
     }
 
     private setupLinks() {
         this.linksGroup.selectAll('*').remove();
-        this.highlightedGroup.selectAll('.link-group').remove();
         
         // Create groups for each link
         this.linkElements = this.linksGroup.selectAll<SVGGElement, GraphLink>('g.link-group')
             .data(this.links)
             .join('g')
-            .attr('class', d => `link-group ${d.type || 'normal'}`)
-            .attr('opacity', d => {
-                if (d.type === 'tag-link' && !this.plugin.settings.showTags) return 0;
-                return 1;
-            });
+            .attr('class', d => `link-group ${d.type || 'normal'}`);
         
         // Add either solid lines or prepare for dotted lines
-        const showArrows = this.showArrows;
         const defaultThickness = this.plugin.settings.defaultLinkThickness;
         this.linkElements.each(function(d) {
             const group = d3.select(this);
             
             if (d.similarity !== undefined && d.similarity > 0 && !d.type) {
-                // For similarity links (not manual links), we'll add dots in the ticked function
+                // Similarity remains distinct from explicit links.
                 group.attr('data-similarity', d.similarity);
                 
                 // Use a dashed line for similarity links to enable animation
@@ -197,7 +169,7 @@ export class GraphRenderer {
                     .attr('class', 'link similarity-link')
                     .style('stroke', 'var(--text-muted)')
                     .style('stroke-opacity', 0.6)
-                    .attr('stroke-width', defaultThickness)
+                    .attr('stroke-width', defaultThickness / 0.5)
                     .attr('stroke-linecap', 'round'); // Round caps for dots
             } else {
                 // Regular solid line for manual links and tag links
@@ -205,359 +177,142 @@ export class GraphRenderer {
                     .attr('class', 'link solid-link')
                     .style('stroke', 'var(--text-muted)')
                     .attr('stroke-opacity', 0.6)
-                    .attr('stroke-width', defaultThickness)
-                    .attr('marker-end', showArrows ? 'url(#arrow)' : null);
+                    .attr('stroke-width', defaultThickness / 0.5);
             }
         });
+        this.updateDottedLinkSize(this.plugin.settings.dottedLinkThickness);
+        this.updateDottedLinkSpacing(this.plugin.settings.dottedLinkSpacing);
+        if (this.isInitialized && this.plugin.settings.showParticleAnimation !== false) {
+            this.startParticleAnimation();
+        }
     }
 
     private setupNodes() {
-        this.nodesGroup.selectAll('*').remove();
-        this.highlightedGroup.selectAll('.node').remove();
-        
-        this.nodeElements = this.nodesGroup.selectAll<SVGGElement, GraphNode>('g')
-            .data(this.nodes)
-            .join('g')
-        .attr('class', d => `node ${d.type || 'file'}`)
-        .attr('opacity', d => {
-            if (d.type === 'tag' && !this.plugin.settings.showTags) return 0;
-            return 1;
-        })
-        .style('pointer-events', d => {
-            if (d.type === 'tag' && !this.plugin.settings.showTags) return 'none';
-            return null;
-        })
-        .call(this.drag());
-
-    // Add circles with size based on connections for tags
-    this.nodeElements.append('circle')
-        .attr('r', d => this.getNodeRadius(d))
-        .attr('fill', d => {
-            if (d.type === 'tag') {
-                return 'var(--text-success)';
-            }
-            return 'var(--text-muted)';
-        })
-        .attr('stroke', 'none')
-        .attr('stroke-width', 0)
-        .style('cursor', 'pointer');
-
-        // Add labels with text wrapping
-        const maxLabelWidth = 240; // Max width in pixels
-        
-        this.nodeElements.each((d, i, nodes) => {
-            const group = d3.select(nodes[i]);
-            const nodeRadius = this.getNodeRadius(d);
-            const yOffset = 0.9*nodeRadius;
-            
-            // Calculate font sizes for consistent text wrapping
-            const baseFontSize = d.type === 'tag' ? 11 : 12;
-            const hoverFontSize = baseFontSize * 1.2;
-            
-            // Create a foreignObject for HTML text wrapping
-            // Store original position for zoom-based counter-scaling
-            const fo = group.append('foreignObject')
-                .attr('x', -maxLabelWidth / 2)
-                .attr('y', yOffset)
-                .attr('width', maxLabelWidth)
-                .attr('height', 60) // Enough height for 3-4 lines
-                .attr('class', 'node-label-container')
-                .attr('data-orig-x', -maxLabelWidth / 2)
-                .attr('data-orig-y', yOffset)
-                .style('pointer-events', 'none') // Make entire foreignObject non-interactive
-                .style('transform-origin', `${maxLabelWidth / 2}px 0px`) // Center-top origin for scaling
-                .style('transform-box', 'fill-box');
-            
-            fo.append('xhtml:div')
-                .style('width', '100%')
-                .style('text-align', 'center')
-                .style('word-wrap', 'break-word')
-                .style('overflow-wrap', 'break-word')
-                .style('hyphens', 'auto')
-                .style('font-size', hoverFontSize + 'px') // Use hover size for layout calculation
-                .style('font-weight', d.type === 'tag' ? '600' : 'normal')
-                .style('color', 'var(--text-normal)')
-                .style('line-height', '1.2')
-                .style('font-family', 'var(--font-interface)')
-                .style('pointer-events', 'none') // Make text labels non-interactive
-                .style('transform', `scale(${baseFontSize / hoverFontSize})`) // Scale down to normal size
-                .style('transform-origin', 'center top')
-                .text(d.name);
-        });
-
+        this.nodesGroup.selectAll('*').interrupt('label-hover').remove();
+        this.nodeElements = this.nodesGroup.selectAll<SVGGElement, GraphNode>('g.node')
+            .data(this.nodes, d => d.id).join('g')
+            .attr('class', d => `node ${d.type || 'file'}`).call(this.drag());
+        this.nodeElements.append('circle').attr('class', 'graphene-node-dot')
+            .attr('fill', d => this.nodeColor(d));
+        // Separate the hover offset from zoom so zooming never restarts the easing.
+        const labelAnchors = this.nodeElements.append('g').attr('class', 'graphene-label-anchor')
+            .style('pointer-events', 'none');
+        const labelMotion = labelAnchors.append('g').attr('class', 'graphene-label-motion')
+            .attr('transform', 'translate(0,0)');
+        const labels = labelMotion.append('foreignObject').attr('class', 'node-label-container')
+            .attr('x', -150).attr('width', 300).attr('height', 200).style('pointer-events', 'none');
+        labels.append('xhtml:div').attr('class', 'graphene-node-label').text(d => d.name);
         this.nodeElements.on('click', (event, d) => {
             event.stopPropagation();
-            if (d.type !== 'tag') {
-                const file = this.plugin.app.vault.getAbstractFileByPath(d.path);
-                if (file instanceof TFile) {
-                    void this.plugin.app.workspace.getLeaf().openFile(file);
-                }
+            if (d.type === 'tag') return;
+            const file = this.plugin.app.vault.getAbstractFileByPath(d.path);
+            if (file instanceof TFile) void this.plugin.app.workspace.getLeaf(event.ctrlKey || event.metaKey).openFile(file);
+        }).on('mouseenter', (_, node) => {
+            if (this.hoveredNodeId && this.hoveredNodeId !== node.id) this.animateLabelOffset(this.hoveredNodeId, false);
+            this.hoveredNodeId = node.id;
+            this.animateLabelOffset(node.id, true);
+            this.hoveredNeighbors = new Set([node.id]);
+            for (const link of this.links) {
+                const source = link.source as GraphNode, target = link.target as GraphNode;
+                if (source.id === node.id) this.hoveredNeighbors.add(target.id);
+                if (target.id === node.id) this.hoveredNeighbors.add(source.id);
             }
+            this.updateAppearance();
+        }).on('mouseleave', () => {
+            if (this.hoveredNodeId) this.animateLabelOffset(this.hoveredNodeId, false);
+            this.hoveredNodeId = null;
+            this.hoveredNeighbors.clear();
+            this.updateAppearance();
         });
+        this.updateAppearance();
+    }
 
-        // Update hover effects
-    this.nodeElements.on('mouseenter', (event, hoveredNode) => {
-        // Build edge set as pairs: E = {(v1, v2) | v1, v2 are vertices}
-        // Store edges that meet threshold and involve the hovered node
-        const connectedEdges = new Set<string>();
-        const connectedNodeIds = new Set<string>();
-        connectedNodeIds.add(hoveredNode.id);
-        
-        this.links.forEach(link => {
-            const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
-            const targetId = typeof link.target === 'string' ? link.target : link.target.id;
-            
-            // Check if the link meets the similarity threshold (or is not a similarity link)
-            const type2 = link.type;
-            const isManual2 = type2 === 'manual-link';
-            const isTagLink2 = type2 === 'tag-link';
-            const meetsThreshold2 = isManual2 || isTagLink2 || (link.similarity !== undefined && link.similarity > this.plugin.settings.similarityThreshold);
-            if (!meetsThreshold2) return;
-            const edgePair2 = `${sourceId}|${targetId}`;
-            if (sourceId === hoveredNode.id || targetId === hoveredNode.id) {
-                connectedEdges.add(edgePair2);
-                connectedNodeIds.add(sourceId === hoveredNode.id ? targetId : sourceId);
-            }
-        });
-
-        // Remember highlighted edges so ticked() can keep dotted links in sync
-        this.highlightedEdges = connectedEdges;
-
-        // Show dimming layer
-        this.dimmingLayer
-            .transition()
-            .duration(200)
-            .attr('opacity', 0.8);
-
-        // Move highlighted elements to highlighted group
-        const highlightedGroupNode = this.highlightedGroup.node();
-        if (highlightedGroupNode) {
-            // Move links first (so they are behind nodes)
-            this.linkElements.each(function(d) {
-                const sourceId = typeof d.source === 'string' ? d.source : d.source.id;
-                const targetId = typeof d.target === 'string' ? d.target : d.target.id;
-                const edgePair = `${sourceId}|${targetId}`;
-                if (connectedEdges.has(edgePair)) {
-                    highlightedGroupNode.appendChild(this);
-                }
-            });
-
-            // Move nodes
-            this.nodeElements.each(function(d) {
-                if (d.id === hoveredNode.id || connectedNodeIds.has(d.id)) {
-                    highlightedGroupNode.appendChild(this);
-                }
-            });
+    private animateLabelOffset(nodeId: string, hovered: boolean) {
+        const label = this.nodeElements.filter(node => node.id === nodeId)
+            .select<SVGGElement>('g.graphene-label-motion');
+        const transform = `translate(0,${hovered ? 15 : 0})`;
+        // Interrupt at the current position so quick pointer reversals never jump.
+        label.interrupt('label-hover');
+        if (this.container.win.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            label.attr('transform', transform);
+        } else {
+            label.transition('label-hover').duration(400).ease(d3.easeCubicOut)
+                .attr('transform', transform);
         }
+    }
 
-        // Update node styling
-        this.nodeElements.selectAll('circle')
-            .transition()
-            .duration(200)
-            .style('fill', function(d: GraphNode) {
-                if (d.id === hoveredNode.id) {
-                    return 'var(--text-accent)';
-                } else if (connectedNodeIds.has(d.id)) {
-                    return d.type === 'tag' ? 'var(--text-success)' : 'var(--text-muted)';
-                } else {
-                    return d.type === 'tag' ? 'var(--text-success)' : 'var(--text-muted)';
-                }
-            })
-            .style('opacity', 1); // Keep full opacity as dimming layer handles the rest
+    private nodeColor(node: GraphNode) {
+        const group = this.plugin.settings.graphGroups?.find(group => group.query.trim() &&
+            `${node.name} ${node.path}`.toLowerCase().includes(group.query.trim().toLowerCase()));
+        return group?.color ?? (node.type === 'tag' ? 'var(--graph-node-tag, var(--text-success))'
+            : node.type === 'unresolved' ? 'var(--graph-node-unresolved, var(--text-faint))'
+            : node.type === 'attachment' ? 'var(--graph-node-attachment, var(--text-muted))'
+            : 'var(--graph-node, var(--text-muted))');
+    }
 
-        // Update link styling - highlight if edge pair contains hovered node
-        const showArrows2 = this.showArrows;
-        this.linkElements.each(function(d: GraphLink) {
-            const group = d3.select(this);
-            const sourceId = typeof d.source === 'string' ? d.source : d.source.id;
-            const targetId = typeof d.target === 'string' ? d.target : d.target.id;
-            const edgePair = `${sourceId}|${targetId}`;
-            // An edge is highlighted if it's in our connected edges set (already filtered to involve hovered node)
-            const highlight = connectedEdges.has(edgePair);
-            
-            // Update solid lines (for manual-link and tag-link)
-            group.select('line.solid-link')
-                .transition()
-                .duration(200)
-                .style('stroke', highlight ? 'var(--interactive-accent)' : 'var(--text-muted)')
-                .attr('stroke-opacity', highlight ? 1 : 0.6) // Keep visible behind dimming layer
-                .attr('marker-end', (d: GraphLink) => showArrows2 ? (highlight ? 'url(#arrow-accent)' : 'url(#arrow)') : null);
-            
-            // Update dots (for similarity links)
-            group.selectAll('line.similarity-link')
-                .transition()
-                .duration(200)
-                .style('stroke', highlight ? 'var(--interactive-accent)' : 'var(--text-muted)')
-                .style('stroke-opacity', highlight ? 1 : 0.6);
-        });
-
-        // Update text styling (opacity + size + vertical offset)
-        // Check current zoom level for smooth fade behavior
-        const svgNode = this.svg.node();
-        const currentZoom = svgNode ? d3.zoomTransform(svgNode).k : 1;
-        // Convert normalized threshold (-3 to 3) to actual zoom level
-        const normalizedThreshold = this.plugin.settings.textFadeThreshold ?? 0;
-        const fadeThreshold = 1.5 + normalizedThreshold;
-        const fadeStart = fadeThreshold * 0.43;
-        const fadeEnd = fadeThreshold * 1.5;
-        
-        // Calculate base opacity from zoom level
-        let baseOpacity = 0;
-        if (currentZoom >= fadeEnd) {
-            baseOpacity = 1;
-        } else if (currentZoom > fadeStart) {
-            baseOpacity = (currentZoom - fadeStart) / (fadeEnd - fadeStart);
-        }
-        
-        this.nodeElements.selectAll('foreignObject')
-            .transition()
-            .duration(200)
-            .style('opacity', (d: GraphNode) => {
-                if (currentZoom < fadeStart) {
-                    // Very zoomed out: only show hovered node
-                    return d.id === hoveredNode.id ? 1 : 0;
-                } else if (currentZoom < fadeThreshold) {
-                    // Partial zoom: gradual fade with hover enhancement
-                    if (d.id === hoveredNode.id) return 1;
-                    if (connectedNodeIds.has(d.id)) return baseOpacity;
-                    return baseOpacity; // Keep base opacity behind dimming layer
-                } else {
-                    // Full zoom: normal behavior
-                    return 1; // Keep full opacity behind dimming layer
-                }
-            });
-            
-        this.nodeElements.selectAll('foreignObject div')
-            .transition()
-            .duration(200)
-            .style('transform', (d: GraphNode) => {
-                const base = d.type === 'tag' ? 11 : 12;
-                const hover = base * 1.2;
-                const isHovered = d.id === hoveredNode.id;
-                const scale = isHovered ? 1.0 : (base / hover); // Scale to 1.0 when hovered, normal scale otherwise
-                return `scale(${scale})`;
-            });
-    })
-    .on('mouseleave', () => {
-        // Hide dimming layer
-        this.dimmingLayer
-            .transition()
-            .duration(200)
-            .attr('opacity', 0);
-
-        // Move elements back to their original groups
-        const nodesGroupNode = this.nodesGroup.node();
-        const linksGroupNode = this.linksGroup.node();
-        
-        if (nodesGroupNode && linksGroupNode) {
-            this.nodeElements.each(function() {
-                nodesGroupNode.appendChild(this);
-            });
-            this.linkElements.each(function() {
-                linksGroupNode.appendChild(this);
-            });
-        }
-
-        // Reset all styling
-        this.nodeElements.selectAll('circle')
-            .transition()
-            .duration(200)
-            .style('fill', (d: GraphNode) => d.type === 'tag' ? 'var(--text-success)' : 'var(--text-muted)')
-            .style('opacity', 1);
-
-        this.highlightedEdges.clear();
-
-        // Reset link styling
-        this.linkElements.each(function() {
-            const group = d3.select(this);
-            
-            group.select('line.solid-link')
-                .transition()
-                .duration(200)
-                .style('stroke', 'var(--text-muted)')
-                .attr('stroke-opacity', 0.6);
-            
-            group.selectAll('line.similarity-link')
-                .transition()
-                .duration(200)
-                .style('stroke', 'var(--text-muted)')
-                .style('stroke-opacity', 0.6);
-        });
-
-        this.nodeElements.selectAll('foreignObject')
-            .transition()
-            .duration(200)
-            .style('opacity', () => {
-                // Check current zoom level for smooth fade when resetting
-                const svgNode = this.svg.node();
-                const currentZoom = svgNode ? d3.zoomTransform(svgNode).k : 1;
-                // Convert normalized threshold (-3 to 3) to actual zoom level
-                const normalizedThreshold = this.plugin.settings.textFadeThreshold ?? 0;
-                const fadeThreshold = 1.5 + normalizedThreshold;
-                const fadeStart = fadeThreshold * 0.43;
-                const fadeEnd = fadeThreshold * 1.5;
-                
-                if (currentZoom >= fadeEnd) {
-                    return 1;
-                } else if (currentZoom > fadeStart) {
-                    return (currentZoom - fadeStart) / (fadeEnd - fadeStart);
-                } else {
-                    return 0;
-                }
-            });
-            
-        this.nodeElements.selectAll('foreignObject div')
-            .transition()
-            .duration(200)
-            .style('transform', (d: GraphNode) => {
-                const base = d.type === 'tag' ? 11 : 12;
-                const hover = base * 1.2;
-                return `scale(${base / hover})`; // Reset to normal scale
-            });
-    });
-}
+    updateAppearance() {
+        if (!this.nodeElements || !this.svg) return;
+        const zoom = d3.zoomTransform(this.svg.node()!).k;
+        const scale = nodeScale(zoom);
+        const opacity = labelOpacity(zoom, this.plugin.settings.textFadeThreshold ?? 0);
+        this.nodeElements.select<SVGCircleElement>('circle.graphene-node-dot')
+            .attr('r', d => this.getNodeRadius(d) * scale)
+            .style('transform', d => d.id === this.hoveredNodeId ? 'scale(1.15)' : 'scale(1)')
+            .attr('fill', d => d.id === this.hoveredNodeId ? 'var(--interactive-accent)' : this.nodeColor(d))
+            .style('opacity', d => this.hoveredNodeId && !this.hoveredNeighbors.has(d.id) ? 0.2 : 1);
+        this.nodeElements.select<SVGGElement>('g.graphene-label-anchor')
+            .attr('transform', d => `translate(0,${(this.getNodeRadius(d) + 5) * scale}) scale(${1 / zoom})`);
+        this.nodeElements.select<SVGForeignObjectElement>('foreignObject')
+            .attr('transform', d => `scale(${d.id === this.hoveredNodeId && zoom < 1 ? 1 : Math.sqrt(zoom)})`)
+            .attr('y', 0)
+            .style('opacity', d => d.id === this.hoveredNodeId ? 1 : opacity * (this.hoveredNodeId && !this.hoveredNeighbors.has(d.id) ? 0.2 : 1));
+        this.nodeElements.select<HTMLDivElement>('foreignObject div')
+            .style('font-size', d => `${14 + this.getNodeRadius(d) / 4}px`);
+        this.linkElements.selectAll<SVGLineElement, GraphLink>('line')
+            .attr('vector-effect', 'non-scaling-stroke')
+            .style('stroke', d => this.hoveredNodeId && ((d.source as GraphNode).id === this.hoveredNodeId || (d.target as GraphNode).id === this.hoveredNodeId)
+                ? 'var(--interactive-accent)' : 'var(--graph-line, var(--text-faint))')
+            .style('stroke-opacity', d => this.hoveredNodeId
+                ? ((d.source as GraphNode).id === this.hoveredNodeId || (d.target as GraphNode).id === this.hoveredNodeId ? 1 : 0.15) : 0.6);
+        this.svg.selectAll('marker').attr('markerWidth', 4 / zoom).attr('markerHeight', 4 / zoom);
+        this.linkElements.select<SVGLineElement>('line.solid-link')
+            .attr('marker-end', d => this.showArrows && zoom > 0.3 && d.type === 'manual-link' ? `url(#${this.arrowId})` : null);
+        this.ticked();
+    }
 
     private setupZoom() {
-        // Zoom is already set up in setupSVG, but let's enhance it
-        this.zoom = d3.zoom<SVGSVGElement, unknown>()
-            .scaleExtent([0.1, 10])
-            .on('zoom', (event) => {
+        this.zoom = d3.zoom<SVGSVGElement, unknown>().scaleExtent([MIN_ZOOM, MAX_ZOOM])
+            .on('zoom', event => {
                 this.g.attr('transform', event.transform);
-                
-                // Handle text fading based on zoom level with smooth transition
-                const zoomLevel = event.transform.k;
-                // Convert normalized threshold (-3 to 3) to actual zoom level
-                // -3 = -1.5 zoom, 0 = 1.5 zoom, 3 = 4.5 zoom
-                const normalizedThreshold = this.plugin.settings.textFadeThreshold ?? 0;
-                const fadeThreshold = 1.5 + normalizedThreshold; // Maps -3->-1.5, 0->1.5, 3->4.5
-                const fadeStart = fadeThreshold * 0.43; // Start fading in at 43% of threshold value
-                const fadeEnd = fadeThreshold * 1.5; // Full opacity at 150% of threshold
-                
-                // Calculate opacity based on zoom level
-                let baseOpacity = 0;
-                if (zoomLevel >= fadeEnd) {
-                    baseOpacity = 1; // Full opacity above fadeEnd
-                } else if (zoomLevel > fadeStart) {
-                    // Gradual fade between fadeStart and fadeEnd (longer range)
-                    baseOpacity = (zoomLevel - fadeStart) / (fadeEnd - fadeStart);
-                } else {
-                    baseOpacity = 0; // Hidden below fadeStart
-                }
-                
-                // Counter-scale text labels so they don't grow/shrink proportionally with zoom
-                const textScale = 1 / Math.pow(zoomLevel, 0.85);
-                this.nodeElements?.selectAll('foreignObject')
-                    .style('opacity', baseOpacity)
-                    .attr('transform', `scale(${textScale})`);
-                
-                // Counter-scale nodes so they stay a consistent visual size
-                const nodeScale =1/ Math.pow(zoomLevel, 0.2);
-                this.nodeElements?.selectAll('circle')
-                    .style('transform', `scale(${nodeScale})`);
+                this.updateAppearance();
             });
-
-        this.svg.call(this.zoom);
+        this.svg.call(this.zoom).on('wheel.zoom', null).on('dblclick.zoom', null)
+            .on('pointerdown.zoom-cancel', () => this.cancelZoom())
+            .on('wheel.native-zoom', (event: WheelEvent) => {
+                event.preventDefault();
+                const current = d3.zoomTransform(this.svg.node()!);
+                this.targetZoom = wheelZoom(this.zoomFrame === null ? current.k : this.targetZoom, event.deltaY, event.deltaMode);
+                const rect = this.svg.node()!.getBoundingClientRect();
+                const anchor: [number, number] = this.targetZoom < current.k
+                    ? [rect.width / 2, rect.height / 2] : [event.clientX - rect.left, event.clientY - rect.top];
+                if (this.zoomFrame !== null) this.container.win.cancelAnimationFrame(this.zoomFrame);
+                const animate = () => {
+                    const transform = d3.zoomTransform(this.svg.node()!);
+                    const next = Math.abs(this.targetZoom / transform.k - 1) < 0.001
+                        ? this.targetZoom : transform.k + (this.targetZoom - transform.k) * 0.15;
+                    const point = transform.invert(anchor);
+                    this.svg.call(this.zoom.transform, d3.zoomIdentity.translate(anchor[0] - point[0] * next, anchor[1] - point[1] * next).scale(next));
+                    this.zoomFrame = next === this.targetZoom ? null : this.container.win.requestAnimationFrame(animate);
+                };
+                this.zoomFrame = this.container.win.requestAnimationFrame(animate);
+            }, { passive: false });
     }
+
+    private cancelZoom() {
+        if (this.zoomFrame !== null) this.container.win.cancelAnimationFrame(this.zoomFrame);
+        this.zoomFrame = null;
+    }
+
     private setupSVG() {
         // Clear any existing SVG
         d3.select(this.container).selectAll('*').remove();
@@ -573,15 +328,6 @@ export class GraphRenderer {
             .attr('viewBox', `0 0 ${width} ${height}`)
             .style('background', 'var(--background-primary)');
 
-        // Add zoom behavior
-        this.zoom = d3.zoom<SVGSVGElement, unknown>()
-            .scaleExtent([0.1, 10])
-            .on('zoom', (event) => {
-                this.g.attr('transform', event.transform);
-            });
-
-        this.svg.call(this.zoom);
-
         // Create main group
         this.g = this.svg.append('g');
 
@@ -589,179 +335,28 @@ export class GraphRenderer {
         this.linksGroup = this.g.append('g').attr('class', 'links');
         this.nodesGroup = this.g.append('g').attr('class', 'nodes');
         
-        // Dimming layer (initially hidden)
-        this.dimmingLayer = this.g.append('rect')
-            .attr('class', 'dimming-layer')
-            .attr('x', -50000)
-            .attr('y', -50000)
-            .attr('width', 100000)
-            .attr('height', 100000)
-            .attr('fill', 'var(--background-primary)')
-            .attr('opacity', 0)
-            .style('pointer-events', 'none');
-
-        // Highlighted group (on top of dimming layer)
-        this.highlightedGroup = this.g.append('g').attr('class', 'highlighted');
-
-        // Add arrow markers
-        this.svg.append('defs').selectAll('marker')
-            .data(['arrow'])
-            .join('marker')
-            .attr('id', 'arrow')
-            .attr('viewBox', '0 -5 10 10')
-            .attr('refX', 20)
-            .attr('refY', 0)
-            .attr('markerWidth', 6)
-            .attr('markerHeight', 6)
-            .attr('orient', 'auto')
-            .append('path')
-            .attr('fill', 'var(--text-muted)')
-            .attr('d', 'M0,-5L10,0L0,5');
-    
     }
 
     private setupSimulation() {
-        const width = this.container.clientWidth || 800;
-        const height = this.container.clientHeight || 600;
-        const centerX = width / 2;
-        const centerY = height / 2;
-
-        // Calculate radius for circular distribution based on center force
-        // High center force = tight circle, Low center force = loose circle
-        const baseRadius = Math.min(width, height) * 0.3;
-        const radiusMultiplier = 1.0 + (1.0 - this.plugin.settings.centerForce) * 2.0; // Range: 1.0x to 3.0x
-        const targetRadius = baseRadius * radiusMultiplier;
-
-        this.simulation = d3.forceSimulation<GraphNode>(this.nodes)
-            .force('link', d3.forceLink<GraphNode, GraphLink>(this.links)
-                .id(d => d.id)
-                .distance(d => {
-                    if (d.similarity !== undefined) {
-                        // Steeper curve for similarity to create high difference in distance
-                        return this.plugin.settings.linkDistance * (3.0 - 2.8 * d.similarity);
-                    }
-                    return this.plugin.settings.linkDistance * 1.2;
-                })
-                .strength((d) => {
-                    if (this.isSearching) {
-                        const s = d.source as GraphNode;
-                        const t = d.target as GraphNode;
-                        if (!this.matchingNodeIds.has(s.id) || !this.matchingNodeIds.has(t.id)) return 0;
-                    }
-                    if (!this.plugin.settings.showTags) {
-                        const s = d.source as GraphNode;
-                        const t = d.target as GraphNode;
-                        if (s.type === 'tag' || t.type === 'tag') return 0;
-                    }
-                    return 0.1;
-                })) // Much weaker link force to allow natural scattering
-            .force('charge', d3.forceManyBody()
-                .strength((d: GraphNode) => {
-                    if (this.isSearching && !this.matchingNodeIds.has(d.id)) return 0;
-                    if (d.type === 'tag' && !this.plugin.settings.showTags) return 0;
-                    return -this.plugin.settings.repulsionForce * 0.8;
-                })
-                .distanceMax(targetRadius * 1.5)) // Scale repulsion distance with target radius
-            .force('radial', d3.forceRadial(targetRadius, centerX, centerY)
-                .radius((d: GraphNode) => {
-                    if (this.isSearching && this.matchingNodeIds.has(d.id)) {
-                        return targetRadius * 0.4;
-                    }
-                    return targetRadius;
-                })
-                .strength((d: GraphNode) => {
-                    if (this.isSearching && !this.matchingNodeIds.has(d.id)) return 0;
-                    return this.isSearching ? 0.1 : 0.05;
-                })) // Gentle radial force to create circular boundary
-            .force('collision', d3.forceCollide()
-                .radius((d: GraphNode) => {
-                    if (this.isSearching && !this.matchingNodeIds.has(d.id)) return 0;
-                    if (d.type === 'tag' && !this.plugin.settings.showTags) return 0;
-                    return this.getNodeRadius(d) + 4;
-                })
-                .strength(0.7)
-                .iterations(2))
+        this.simulation = d3.forceSimulation<GraphNode>([])
+            .velocityDecay(0.35)
+            .alphaDecay(0.025)
             .on('tick', () => this.ticked());
+        this.updateForces();
+    }
 
-        // Apply initial positions scattered naturally within the target circle
-        this.nodes.forEach((node) => {
-            // Random angle and distance for natural distribution
-            const angle = Math.random() * 2 * Math.PI;
-            const distance = Math.sqrt(Math.random()) * targetRadius * 0.8; // sqrt for uniform distribution
-            node.x = centerX + Math.cos(angle) * distance;
-            node.y = centerY + Math.sin(angle) * distance;
-        });
+    updateForces() {
+        if (!this.simulation) return;
+        configureLayout(this.simulation, this.nodes, this.links, this.plugin.settings,
+            (this.container.clientWidth || 800) / 2, (this.container.clientHeight || 600) / 2,
+            node => !node.hidden && this.matchesFilters(node),
+            node => this.getNodeRadius(node));
+        this.reheat();
+    }
 
-        this.simulation.alpha(1).restart();
-    }    updateForces() {
-        const width = this.container.clientWidth || 800;
-        const height = this.container.clientHeight || 600;
-        const centerX = width / 2;
-        const centerY = height / 2;
-        
-        // Calculate new target radius based on center force setting
-        const baseRadius = Math.min(width, height) * 0.3;
-        const radiusMultiplier = 1.0 + (1.0 - this.plugin.settings.centerForce) * 2.0;
-        const targetRadius = baseRadius * radiusMultiplier;
-            
-        if (this.simulation) {
-            // Update charge force
-            (this.simulation.force('charge') as d3.ForceManyBody<GraphNode>)
-                ?.strength((d: GraphNode) => {
-                    if (this.isSearching && !this.matchingNodeIds.has(d.id)) return 0;
-                    if (d.type === 'tag' && !this.plugin.settings.showTags) return 0;
-                    return -this.plugin.settings.repulsionForce * 0.8;
-                })
-                ?.distanceMax(targetRadius * 1.5);
-            
-            // Update link distances and strength
-            (this.simulation.force('link') as d3.ForceLink<GraphNode, GraphLink>)
-                ?.distance(d => {
-                    if (d.similarity !== undefined) {
-                        return this.plugin.settings.linkDistance * (3.0 - 2.8 * d.similarity);
-                    }
-                    return this.plugin.settings.linkDistance * 1.2;
-                })
-                ?.strength((d) => {
-                    if (this.isSearching) {
-                        const s = d.source as GraphNode;
-                        const t = d.target as GraphNode;
-                        if (!this.matchingNodeIds.has(s.id) || !this.matchingNodeIds.has(t.id)) return 0;
-                    }
-                    if (!this.plugin.settings.showTags) {
-                        const s = d.source as GraphNode;
-                        const t = d.target as GraphNode;
-                        if (s.type === 'tag' || t.type === 'tag') return 0;
-                    }
-                    return 0.1;
-                });
-            
-            // Update radial force with new radius - this controls tight vs loose circle
-            (this.simulation.force('radial') as d3.ForceRadial<GraphNode>)
-                ?.radius((d: GraphNode) => {
-                    if (this.isSearching && this.matchingNodeIds.has(d.id)) {
-                        // Pull matching nodes into a tighter circle
-                        return targetRadius * 0.4;
-                    }
-                    return targetRadius;
-                })
-                ?.x(centerX)
-                ?.y(centerY)
-                ?.strength((d: GraphNode) => {
-                    if (this.isSearching && !this.matchingNodeIds.has(d.id)) return 0;
-                    return this.isSearching ? 0.1 : 0.05;
-                });
-
-            // Update collision force
-            (this.simulation.force('collision') as d3.ForceCollide<GraphNode>)
-                ?.radius((d: GraphNode) => {
-                    if (this.isSearching && !this.matchingNodeIds.has(d.id)) return 0;
-                    if (d.type === 'tag' && !this.plugin.settings.showTags) return 0;
-                    return this.getNodeRadius(d) + 4;
-                });
-
-            this.simulation.alpha(0.3).restart();
-        }
+    private reheat() {
+        if (this.isAnimating) this.simulation.alpha(Math.max(this.simulation.alpha(), 0.3)).restart();
+        else this.simulation.stop();
     }
 
     private drag() {
@@ -783,88 +378,22 @@ export class GraphRenderer {
             });
     }
 
-    private render() {
-        // Render links
-        this.linkElements = this.g.append('g')
-            .attr('class', 'links')
-            .selectAll<SVGLineElement, GraphLink>('line')
-            .data(this.links)
-            .join('line')
-            .attr('stroke', d => {
-                if (d.similarity !== undefined) {
-                    const hue = d.similarity * 120;
-                    return `hsl(${hue}, 50%, 50%)`;
-                }
-                return 'var(--text-muted)';
-            })
-            .attr('stroke-opacity', 0.6)
-            .attr('stroke-width', d => d.thickness || this.plugin.settings.defaultLinkThickness);
-
-        // Render nodes
-        const node = this.g.append('g')
-            .attr('class', 'nodes')
-            .selectAll<SVGGElement, GraphNode>('g')
-            .data(this.nodes)
-            .join('g')
-            .attr('class', 'node')
-            .call(this.drag());
-
-        // Add circles
-        node.append('circle')
-            .attr('r', this.plugin.settings.nodeSize)
-            .style('fill', d => d.embedding ? 'var(--interactive-accent)' : 'var(--text-accent)')
-            .attr('stroke', 'none')
-            .attr('stroke-width', 0);
-
-        // Add labels
-        node.append('text')
-            .text(d => d.name)
-            .attr('x', 0)
-            .attr('y', -this.plugin.settings.nodeSize - 5)
-            .attr('text-anchor', 'middle')
-            .attr('font-size', '12px')
-            .attr('fill', 'var(--text-normal)')
-            .attr('class', 'node-label');
-
-        // Add hover effects
-        node.on('mouseenter', (event, d) => {
-            d3.select(event.currentTarget).select('circle')
-                .transition()
-                .duration(200)
-                .attr('r', this.plugin.settings.nodeSize * 1.2);
-        })
-        .on('mouseleave', (event, d) => {
-            d3.select(event.currentTarget).select('circle')
-                .transition()
-                .duration(200)
-                .attr('r', this.plugin.settings.nodeSize);
-        });
-
-        // Handle clicks
-        node.on('click', (event, d) => {
-            event.stopPropagation();
-            const file = this.plugin.app.vault.getAbstractFileByPath(d.path);
-            if (file instanceof TFile) {
-                void this.plugin.app.workspace.getLeaf().openFile(file);
-            }
-        });
-
-        this.nodeElements = node;
-    }
-
     private ticked() {
-        // Update link positions
-        const similarityThreshold = this.plugin.settings.similarityThreshold;
+        // Clip connections to the visible node edges at every zoom level.
+        const scale = nodeScale(d3.zoomTransform(this.svg.node()!).k);
         this.linkElements.each((d: GraphLink, index, groups) => {
             const group = d3.select(groups[index]);
             const source = d.source as GraphNode;
             const target = d.target as GraphNode;
             
-            // Update solid lines - connect center to center since nodes are CSS-scaled
-            const x1 = source.x!;
-            const y1 = source.y!;
-            const x2 = target.x!;
-            const y2 = target.y!;
+            const dx = target.x! - source.x!, dy = target.y! - source.y!;
+            const distance = Math.hypot(dx, dy) || 1;
+            const sourceRadius = Math.min(distance / 2, this.getNodeRadius(source) * scale);
+            const targetRadius = Math.min(distance / 2, this.getNodeRadius(target) * scale);
+            const x1 = source.x! + dx / distance * sourceRadius;
+            const y1 = source.y! + dy / distance * sourceRadius;
+            const x2 = target.x! - dx / distance * targetRadius;
+            const y2 = target.y! - dy / distance * targetRadius;
 
             group.select('line.solid-link')
                 .attr('x1', x1)
@@ -875,230 +404,86 @@ export class GraphRenderer {
             // Handle dotted lines for similarity links
             const similarity = group.attr('data-similarity');
             if (similarity) {
-                const sim = parseFloat(similarity);
-                const dotRadiusSetting = this.plugin.settings.dottedLinkThickness ?? Math.max(1, this.plugin.settings.defaultLinkThickness / 2);
-                
-                // Normalize similarity to 0-1 range based on threshold
-                const normalizedSim = Math.max(0, (sim - similarityThreshold) / (1 - similarityThreshold));
-                
-                // Spacing inversely proportional to similarity: higher similarity = tighter spacing
-                // User setting is normalized (1 = 20px base), scale from base*0.25 (high sim) to base*3 (low sim)
-                const spacingMultiplier = this.plugin.settings.dottedLinkSpacing ?? 1;
-                const baseSpacing = spacingMultiplier * 20; // 1 = 20px
-                const minSpacing = baseSpacing * 0.25;
-                const maxSpacing = baseSpacing * 3;
-                const spacing = maxSpacing - normalizedSim * (maxSpacing - minSpacing);
-                
                 group.select('line.similarity-link')
                     .attr('x1', x1)
                     .attr('y1', y1)
                     .attr('x2', x2)
-                    .attr('y2', y2)
-                    .attr('stroke-width', dotRadiusSetting * 2)
-                    .style('stroke-dasharray', `0 ${spacing}`);
+                    .attr('y2', y2);
             }
         });
         
         // Update node positions
         this.nodeElements.attr('transform', d => `translate(${d.x},${d.y})`);
-    }    // Add these methods to GraphRenderer class:
+    }
 
     applyNodeVisibility() {
-        // Update node visibility
-        this.nodeElements
-            .style('display', d => d.hidden ? 'none' : 'block');
-        
-        // Update link visibility
-        this.linkElements
-            .style('display', d => {
-                const source = typeof d.source === 'string' ? d.source : d.source.id;
-                const target = typeof d.target === 'string' ? d.target : d.target.id;
-                const sourceNode = this.nodes.find(n => n.id === source);
-                const targetNode = this.nodes.find(n => n.id === target);
-                return (sourceNode?.hidden || targetNode?.hidden) ? 'none' : 'block';
-            });
+        if (!this.nodeElements) return;
+        this.calculateDegrees();
+        for (const node of this.nodes) {
+            node.hidden = !this.matchesFilters(node)
+                || (!this.plugin.settings.showOrphans && !this.degrees.get(node.id));
+        }
+        this.nodeElements.style('display', d => d.hidden ? 'none' : null);
+        this.linkElements.style('display', d => (d.source as GraphNode).hidden || (d.target as GraphNode).hidden ? 'none' : null);
+        this.updateAppearance();
+        this.updateForces();
     }
 
     toggleTags(showTags: boolean) {
-        // Update node visibility
-        this.nodeElements
-            .attr('opacity', d => {
-                if (d.type === 'tag' && !showTags) return 0;
-                return 1;
-            })
-            .style('pointer-events', d => {
-                if (d.type === 'tag' && !showTags) return 'none';
-                return 'all';
-            });
+        this.plugin.settings.showTags = showTags;
+        this.applyNodeVisibility();
+    }
 
-        // Update link visibility
-        this.linkElements
-            .attr('opacity', d => {
-                if (d.type === 'tag-link' && !showTags) return 0;
-                return 1;
-            });
-
-        // Update forces to ignore hidden tags
-        this.updateForces();
+    toggleAttachments(showAttachments: boolean) {
+        this.plugin.settings.showAttachments = showAttachments;
+        this.applyNodeVisibility();
     }
 
     toggleArrows(showArrows: boolean) {
         this.showArrows = showArrows;
-        // Update all existing solid lines' markers
-        this.linkElements?.selectAll('line')
-            .attr('marker-end', showArrows ? 'url(#arrow)' : null);
+        this.updateAppearance();
     }
 
     async searchFileContents(searchTerm: string) {
-        if (!searchTerm || searchTerm.trim() === '') {
-            this.isSearching = false;
-            this.matchingNodeIds.clear();
-            
-            // Clear search - restore all nodes
-            this.nodes.forEach(node => {
-                node.fx = null;
-                node.fy = null;
-            });
-            
-            this.nodeElements
-                .transition()
-                .duration(300)
-                .attr('opacity', d => {
-                    if (d.type === 'tag' && !this.plugin.settings.showTags) return 0;
-                    return 1;
-                })
-                .style('pointer-events', 'all');
-            
-            this.linkElements
-                .transition()
-                .duration(300)
-                .attr('opacity', d => {
-                    if (d.type === 'tag-link' && !this.plugin.settings.showTags) return 0;
-                    return 1;
-                });
-            
-            this.updateForces();
-            return;
-        }
-        
-        const term = searchTerm.toLowerCase();
-        const matchingNodeIds = new Set<string>();
-        
-        // Search through all file nodes
-        for (const node of this.nodes) {
-            if (node.type === 'file' || !node.type) {
-                const file = this.plugin.app.vault.getAbstractFileByPath(node.path);
-                if (file instanceof TFile) {
-                    try {
-                        const content = await this.plugin.app.vault.cachedRead(file);
-                        if (content.toLowerCase().includes(term)) {
-                            matchingNodeIds.add(node.id);
-                        }
-                    } catch (error) {
-                        console.error('Error reading file:', node.path, error);
+        this.searchTerm = searchTerm;
+        const version = ++this.searchVersion;
+        const term = searchTerm.trim().toLowerCase();
+        const matching = new Set<string>();
+        if (term) {
+            for (const node of this.nodes) {
+                if (`${node.name} ${node.path}`.toLowerCase().includes(term)) matching.add(node.id);
+                else if (node.type === 'file' || !node.type) {
+                    const file = this.plugin.app.vault.getAbstractFileByPath(node.path);
+                    if (file instanceof TFile) {
+                        try {
+                            if ((await this.plugin.app.vault.cachedRead(file)).toLowerCase().includes(term)) matching.add(node.id);
+                        } catch { /* A file may be removed while searching. */ }
+                        if (version !== this.searchVersion) return;
                     }
                 }
-            } else if (node.type === 'tag') {
-                // Include tags if they match the search term or are connected to matching files
-                if (node.name.toLowerCase().includes(term)) {
-                    matchingNodeIds.add(node.id);
-                }
+            }
+            for (const link of this.links) {
+                if (link.type !== 'tag-link') continue;
+                const source = link.source as GraphNode, target = link.target as GraphNode;
+                if (source.type === 'tag' && matching.has(target.id)) matching.add(source.id);
+                if (target.type === 'tag' && matching.has(source.id)) matching.add(target.id);
             }
         }
-        
-        // Include tags that are connected to matching files
-        this.links.forEach(link => {
-            const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
-            const targetId = typeof link.target === 'string' ? link.target : link.target.id;
-            
-            if (link.type === 'tag-link') {
-                const sourceNode = this.nodes.find(n => n.id === sourceId);
-                const targetNode = this.nodes.find(n => n.id === targetId);
-                
-                if (sourceNode?.type === 'tag' && matchingNodeIds.has(targetId)) {
-                    matchingNodeIds.add(sourceId);
-                } else if (targetNode?.type === 'tag' && matchingNodeIds.has(sourceId)) {
-                    matchingNodeIds.add(targetId);
-                }
-            }
-        });
-        
-        // Update node visibility and forces
-        this.isSearching = true;
-        this.matchingNodeIds = matchingNodeIds;
-        
-        this.nodes.forEach(node => {
-            if (!matchingNodeIds.has(node.id)) {
-                // Freeze non-matching nodes at their current position
-                node.fx = node.x;
-                node.fy = node.y;
-            } else {
-                // Allow matching nodes to move freely
-                node.fx = null;
-                node.fy = null;
-            }
-        });
-        
-        // Update node opacity
-        this.nodeElements
-            .transition()
-            .duration(300)
-            .attr('opacity', d => matchingNodeIds.has(d.id) ? 1 : 0)
-            .style('pointer-events', d => matchingNodeIds.has(d.id) ? 'all' : 'none');
-        
-        // Update link opacity - only show links between matching nodes
-        this.linkElements
-            .transition()
-            .duration(300)
-            .attr('opacity', d => {
-                const sourceId = typeof d.source === 'string' ? d.source : d.source.id;
-                const targetId = typeof d.target === 'string' ? d.target : d.target.id;
-                return (matchingNodeIds.has(sourceId) && matchingNodeIds.has(targetId)) ? 1 : 0;
-            });
-        
-        // Update forces to reorganize matching nodes into a circle
-        this.updateForces();
+        if (version !== this.searchVersion) return;
+        this.isSearching = !!term;
+        this.matchingNodeIds = matching;
+        this.applyNodeVisibility();
     }
 
-    setTextFadeThreshold(normalizedThreshold: number) {
-        // Implement smooth text fading based on zoom level
-        // Convert normalized threshold (-3 to 3) to actual zoom level
-        const svgNode = this.svg.node();
-        if (!svgNode) return;
-        const currentZoom = d3.zoomTransform(svgNode).k;
-        const threshold = 1.5 + normalizedThreshold; // Maps -3->-1.5, 0->1.5, 3->4.5
-        const fadeStart = threshold * 0.43;
-        const fadeEnd = threshold * 1.5;
-        
-        let opacity = 0;
-        if (currentZoom >= fadeEnd) {
-            opacity = 1;
-        } else if (currentZoom > fadeStart) {
-            opacity = (currentZoom - fadeStart) / (fadeEnd - fadeStart);
-        }
-        
-        this.nodeElements.selectAll('foreignObject')
-            .style('opacity', opacity);
+    setTextFadeThreshold(threshold: number) {
+        this.plugin.settings.textFadeThreshold = threshold;
+        this.updateAppearance();
     }
-
-    // Add or update this method in the GraphRenderer class:
 
     updateNodeSize(size: number) {
-        // Update all nodes using the centralized radius calculation
-        this.nodeElements?.selectAll('circle')
-            .attr('r', (d: GraphNode) => this.getNodeRadius(d));
-        
-        // Update collision force to account for new sizes
-        if (this.simulation) {
-            (this.simulation.force('collision') as d3.ForceCollide<GraphNode>)
-                ?.radius(d => {
-                    if (this.isSearching && !this.matchingNodeIds.has(d.id)) return 0;
-                    if (d.type === 'tag' && !this.plugin.settings.showTags) return 0;
-                    return this.getNodeRadius(d) + 4;
-                });
-            
-            this.simulation.alpha(0.3).restart();
-        }
+        this.plugin.settings.nodeSize = size;
+        this.updateAppearance();
+        this.updateForces();
     }
     updateLinkThickness(thickness: number) {
         // Apply thickness to solid lines inside each link group.
@@ -1107,7 +492,7 @@ export class GraphRenderer {
             const isSolidLink = rawLink.type === 'manual-link' || rawLink.type === 'tag-link' || !rawLink.type;
             const width = isSolidLink ? thickness : (rawLink.thickness || thickness);
             group.select('line.solid-link')
-                .attr('stroke-width', width);
+                .attr('stroke-width', width / 0.5);
         });
 
         // Keep dotted similarity edges visually in sync by scaling their dot radius relative to solid edges when needed.
@@ -1129,7 +514,7 @@ export class GraphRenderer {
             const similarity = group.attr('data-similarity');
             if (similarity) {
                 const sim = parseFloat(similarity);
-                const normalizedSim = Math.max(0, (sim - similarityThreshold) / (1 - similarityThreshold));
+                const normalizedSim = Math.max(0, Math.min(1, (sim - similarityThreshold) / Math.max(0.000001, 1 - similarityThreshold)));
                 const minSpacing = baseSpacing * 0.25;
                 const maxSpacing = baseSpacing * 3;
                 const spacing = maxSpacing - normalizedSim * (maxSpacing - minSpacing);
@@ -1140,17 +525,24 @@ export class GraphRenderer {
     }
 
     updateLinkForce(strength: number) {
-        this.simulation.force('link', d3.forceLink<GraphNode, GraphLink>(this.links)
-            .id(d => d.id)
-            .distance(this.plugin.settings.linkDistance)
-            .strength(strength));
-        this.simulation.alpha(0.3).restart();
+        this.plugin.settings.linkForce = strength;
+        this.updateForces();
+    }
+
+    animateLayout() {
+        const transform = d3.zoomTransform(this.svg.node()!);
+        const [x, y] = transform.invert([(this.container.clientWidth || 800) / 2, (this.container.clientHeight || 600) / 2]);
+        this.links = prepareLayout(this.nodes, this.links, [], x, y);
+        this.setupLinks();
+        this.applyNodeVisibility();
+        this.isAnimating = true;
+        this.simulation.alpha(1).restart();
     }
 
     toggleAnimation(animate: boolean) {
         this.isAnimating = animate;
         if (animate) {
-            this.simulation.restart();
+            this.simulation.alpha(1).restart();
         } else {
             this.simulation.stop();
         }
@@ -1164,28 +556,15 @@ export class GraphRenderer {
             this.svg.attr('viewBox', `0 0 ${width} ${height}`);
         }
         
-        if (this.simulation) {
-            const centerX = width / 2;
-            const centerY = height / 2;
-            const baseRadius = Math.min(width, height) * 0.3;
-            const radiusMultiplier = 1.0 + (1.0 - this.plugin.settings.centerForce) * 2.0;
-            const targetRadius = baseRadius * radiusMultiplier;
-            
-            // Update radial force with new dimensions
-            (this.simulation.force('radial') as d3.ForceRadial<GraphNode>)
-                ?.radius(targetRadius)
-                ?.x(centerX)
-                ?.y(centerY);
-                
-            // Update charge distance max
-            (this.simulation.force('charge') as d3.ForceManyBody<GraphNode>)
-                ?.distanceMax(targetRadius * 1.5);
-                
-            this.simulation.alpha(0.3).restart();
-        }
+        this.updateForces();
     }
 
     destroy() {
+        this.isInitialized = false;
+        this.searchVersion++;
+        this.cancelZoom();
+        this.resizeObserver?.disconnect();
+        this.nodeElements?.selectAll('g.graphene-label-motion').interrupt('label-hover');
         if (this.simulation) {
             this.simulation.stop();
         }

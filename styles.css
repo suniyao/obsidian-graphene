@@ -1,335 +1,58 @@
-/* Better Graph View Layout */
-.better-graph-view {
-    width: 100%;
-    height: 100%;
-    position: relative;
-    overflow: hidden;
+/* Graphene shares Obsidian's native graph control components and theme tokens. */
+.better-graph-view { width: 100%; height: 100%; position: relative; overflow: hidden; padding: 0 !important; }
+.better-graph-view .graph-main-container { width: 100%; height: 100%; position: relative; }
+.better-graph-view .graph-container { position: absolute; inset: 0; overflow: hidden; }
+.better-graph-view .graph-container > svg { width: 100%; height: 100%; touch-action: none; }
+.better-graph-view .graph-control-panel {
+    z-index: 10;
+    width: var(--graph-controls-width, 240px);
+    max-width: calc(100% - 24px);
+    max-height: calc(100% - 24px);
 }
-
-.graph-main-container {
-    width: 100%;
-    height: 100%;
-    position: relative;
+.better-graph-view .graph-control-header { position: absolute; right: 6px; top: 4px; z-index: 1; }
+.better-graph-view .graph-control-actions { display: flex; gap: 2px; }
+.better-graph-view .graph-control-close { width: 26px; height: 26px; padding: 4px; }
+.better-graph-view .graph-control-toggle { position: absolute; right: 12px; top: 12px; z-index: 10; }
+.better-graph-view .is-hidden { display: none !important; }
+.better-graph-view .graphene-section-header {
+    display: flex; align-items: center; gap: 6px; width: 100%;
+    padding: 4px 0; background: none; box-shadow: none; border: 0; justify-content: flex-start;
+    color: var(--text-normal); font-size: var(--font-ui-small); font-weight: var(--font-medium);
 }
-
-.graph-container {
-    width: 100%;
-    height: 100%;
-    position: absolute;
-    top: 0;
-    left: 0;
-    overflow: hidden;
+.better-graph-view .graph-control-section:first-child .graphene-section-header { padding-right: 55px; }
+.better-graph-view .graphene-section-header svg { width: 12px; height: 12px; color: var(--text-muted); }
+.better-graph-view .tree-item-children[hidden] { display: none; }
+.better-graph-view .graphene-node-label {
+    width: 100%; text-align: center; overflow-wrap: anywhere; line-height: 1.2;
+    color: var(--graph-text, var(--text-normal)); font-family: var(--font-interface); font-weight: 400;
 }
-
-.graph-container svg {
-    width: 100%;
-    height: 100%;
-}
-
-/* Graph Control Panel */
-.graph-control-panel {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    width: 260px;
-    max-height: calc(100% - 16px);
-    background: var(--background-primary);
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 6px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    z-index: 100;
-    display: flex;
-    flex-direction: column;
-}
-
-.graph-control-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--background-modifier-border);
-    flex-shrink: 0;
-}
-
-.graph-control-title {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-weight: 500;
-    color: var(--text-normal);
+.better-graph-view .node-label-container { overflow: visible; }
+/* Animate only hover appearance, leaving layout movement and zoom responsive. */
+.better-graph-view .graphene-node-dot {
     cursor: pointer;
+    transform-box: fill-box;
+    transform-origin: center;
+    transition: opacity 200ms ease, fill 200ms ease, transform 160ms ease;
 }
-
-.graph-control-close {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    border-radius: 3px;
-    cursor: pointer;
-    color: var(--text-muted);
+.better-graph-view .node-label-container { transition: opacity 200ms ease; }
+.better-graph-view .link-group line { transition: stroke-opacity 200ms ease, stroke 200ms ease; }
+.better-graph-view .graphene-group-action .setting-item-info { display: none; }
+.better-graph-view .graphene-group-action .setting-item-control { flex: 1; justify-content: center; }
+.better-graph-view .mod-groups > .tree-item-children { margin-inline: 0; padding-inline: 0; }
+@media (prefers-reduced-motion: reduce) {
+    .better-graph-view .graphene-node-dot,
+    .better-graph-view .node-label-container,
+    .better-graph-view .link-group line { transition: none; }
 }
-
-.graph-control-close:hover {
-    background: var(--background-modifier-hover);
-    color: var(--text-normal);
-}
-
-.graph-control-actions {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 4px;
-}
-
-.graph-controls-content {
-    overflow-y: auto;
-    overflow-x: hidden;
-    flex: 1;
-}
-
-.graph-control-toggle {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--background-primary);
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 6px;
-    cursor: pointer;
-    z-index: 99;
-    color: var(--text-muted);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.graph-control-toggle:hover {
-    background: linear-gradient(var(--background-modifier-hover), var(--background-modifier-hover)), var(--background-primary);
-    color: var(--text-normal);
-}
-
-/* Utility Classes */
-.is-hidden {
-    display: none !important;
-}
-
-/* Control Sections */
-.search-section {
-    padding: 16px 14px;
-    border-bottom: 1px solid var(--background-modifier-border);
-}
-
-.control-section {
-    border-bottom: 1px solid var(--background-modifier-border);
-}
-
-.control-section:last-child {
-    border-bottom: none;
-}
-
-.section-header {
-    display: flex;
-    align-items: center;
-    padding: 8px 12px;
-    cursor: pointer;
-    gap: 6px;
-}
-
-.section-header:hover {
-    background: var(--background-modifier-hover);
-}
-
-.section-chevron {
-    display: flex;
-    align-items: center;
-    width: 16px;
-    height: 16px;
-    color: var(--text-faint);
-}
-
-.section-title {
-    font-weight: 500;
-    color: var(--text-normal);
-    font-size: 13px;
-}
-
-.section-content {
-    padding: 8px 12px;
-}
-
-/* Search Input */
-.search-container {
-    position: relative;
-    display: flex;
-    align-items: center;
-}
-
-.search-input {
-    flex: 1;
-    padding: 8px 10px 8px 32px !important; /* Extra padding on left for icon */
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 5px;
-    background: var(--background-primary);
-    color: var(--text-normal);
-    font-size: 13px;
-    transition: border-color 0.2s ease;
-}
-
-.search-input:focus {
-    outline: none;
-    border-color: var(--interactive-accent);
-    box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb), 0.2);
-}
-
-.search-input::placeholder {
-    color: var(--text-faint);
-}
-
-.search-icon {
-    position: absolute;
-    left: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-muted);
-    width: 16px;
-    height: 16px;
-    pointer-events: none; /* Let clicks pass through to input */
-}
-
-/* Toggle Switch */
-.toggle-container {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 6px 0;
-    font-size: 13px;
-    color: var(--text-normal);
-}
-
-
-
-/* Slider */
-.slider-container {
-    margin: 12px 0;
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    margin-bottom: 12px;
-}
-
-.slider-label {
-    display: block;
-    margin-bottom: 8px;
-    font-size: 13px;
-    color: var(--text-normal);
-}
-
-.slider {
-    width: 100% !important;
-    display: block !important;
-    height: 4px;
-    -webkit-appearance: none;
-    appearance: none;
-    background: var(--background-modifier-border);
-    border-radius: 2px;
-    outline: none;
-}
-
-.w-full {
-    width: 100% !important;
-    display: block !important;
-}
-
-.slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 12px;
-    height: 12px;
-    background: var(--interactive-accent);
-    border-radius: 50%;
-    cursor: pointer;
-}
-
-.slider::-moz-range-thumb {
-    width: 12px;
-    height: 12px;
-    background: var(--interactive-accent);
-    border-radius: 50%;
-    cursor: pointer;
-    border: none;
-}
-
-/* SVG Node Styles */
-.node {
-    cursor: pointer;
-}
-
-.node circle {
-    transition: all 0.2s ease;
-}
-
-.node-label {
-    pointer-events: none;
-    user-select: none;
-    font-family: var(--font-interface);
-    transition: opacity 0.2s ease;
-    font-size: 25px;  /* Add this - increased from default 12px */
-}
-
-/* Tag-specific styling */
-.node.tag circle {
-    filter: brightness(1.2);
-}
-
-.node.tag .node-label {
-    font-weight: 600;
-    font-size: 16px;  /* Add this - slightly smaller than regular nodes */
-}
-
-/* Link Styles */
-.link-group {
-    pointer-events: none;
-}
-
-.link-dot {
-    pointer-events: none;
-    transition: opacity 0.2s ease;
-}
-
-.solid-link {
-    fill: none;
-    stroke: var(--text-muted);
-    transition: stroke-opacity 0.2s ease;
-    pointer-events: none;
-}
-
-/* Arrow marker */
-#arrow {
-    opacity: 0.6;
-}
-
-/* Z-index layering */
-.links {
-    z-index: 1;
-}
-
-.nodes {
-    z-index: 2;
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-    .graph-control-panel {
-        width: 250px;
-    }
-}
-
-/* Add at the end of the file */
+.better-graph-view .link-group { pointer-events: none; }
+.better-graph-view .graphene-control-hint { color: var(--text-muted); font-size: var(--font-ui-smaller); margin: 4px 0 12px; }
+.better-graph-view .graphene-group { display: flex; align-items: center; gap: 4px; margin-bottom: 6px; }
+.better-graph-view .graphene-group input[type=text] { min-width: 0; flex: 1; }
+.better-graph-view .graphene-group input[type=color] { flex: 0 0 20px; width: 20px; height: 20px; padding: 0; border: 0; }
+.better-graph-view .mod-display .setting-item:last-child .setting-item-control,
+.better-graph-view .mod-groups .setting-item-control { width: 100%; }
+.better-graph-view .mod-display .setting-item:last-child button,
+.better-graph-view .mod-groups .setting-item-control button { width: 100%; }
 
 /* Embedding Status */
 .embedding-status-container {

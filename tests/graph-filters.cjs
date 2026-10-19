@@ -1,0 +1,32 @@
+const assert = require('node:assert/strict');
+const {buildSync} = require('esbuild');
+const vm = require('node:vm');
+const result = buildSync({stdin: {contents: "export * from './src/ui/GraphFilters'; export * from './src/ui/GraphLayout'; export {DEFAULT_SETTINGS} from './src/types'; export {forceSimulation} from 'd3';", resolveDir: process.cwd()}, bundle: true, platform: 'node', format: 'cjs', write: false});
+const sandbox = {module: {exports: {}}, exports: {}, setTimeout, clearTimeout, setInterval, clearInterval, performance};
+vm.runInNewContext(result.outputFiles[0].text, sandbox);
+const {matchesGraphFilters, visibleDegrees, configureLayout, prepareLayout, DEFAULT_SETTINGS, forceSimulation} = sandbox.module.exports;
+const settings = {...DEFAULT_SETTINGS, existingFilesOnly: true, showAttachments: false, showTags: false};
+const nodes = ['note', 'image', 'pdf', 'tag', 'missing'].map((id, i) => ({id, name: id, path: id, type: ['file', 'attachment', 'attachment', 'tag', 'unresolved'][i]}));
+const links = prepareLayout(nodes, [{id: 'embedded', source: 'note', target: 'image', type: 'manual-link'}], [], 400, 300);
+let search = null;
+const visible = n => matchesGraphFilters(n, settings, search);
+const simulation = forceSimulation([]).stop();
+for (const enabled of [false, true, false, true]) {
+    settings.showAttachments = enabled;
+    const degree = visibleDegrees(links, visible);
+    assert.equal(visible(nodes[1]), enabled);
+    assert.equal(degree.get('note') ?? 0, enabled ? 1 : 0, 'hidden attachments do not prevent notes from becoming orphans');
+    configureLayout(simulation, nodes, links, settings, 400, 300, visible, () => 8);
+    assert.equal(simulation.nodes().length, enabled ? 3 : 1, 'toggle includes/excludes attachment physics');
+    assert.equal(simulation.force('link').links().length, enabled ? 1 : 0);
+}
+search = new Set(['pdf']);
+assert.equal(nodes.filter(visible).length, 1, 'attachment name search can show an attachment');
+settings.showAttachments = false;
+assert.equal(nodes.filter(visible).length, 0, 'search never overrides attachment toggle');
+search = null;
+assert(!visible(nodes[4]));
+settings.existingFilesOnly = false;
+assert(visible(nodes[4]));
+simulation.stop();
+console.log('Graph filter checks passed: repeated toggles, links, physics, orphans, search, unresolved files.');

@@ -357,6 +357,13 @@ updateEmbeddingStatusUI(): void {
         await this.saveData(data);
     }
 
+    async getGraphEmbeddings(): Promise<Record<string, number[]>> {
+        const data = await this.loadData();
+        // Accept the older nested cache without modifying stored vectors.
+        const embeddings = data?.embeddings;
+        return embeddings?.embeddings ?? embeddings ?? {};
+    }
+
     async getEmbeddingLocally(filePath: string): Promise<number[] | null> {
         const data = await this.loadData() || {};
         return data.embeddings?.[filePath] || null;
@@ -379,7 +386,11 @@ updateEmbeddingStatusUI(): void {
     }
 
     async resetGraphSettings() {
-        // Reset only graph-related settings to defaults
+        // Reset display and filters without touching embedding settings or cached vectors.
+        this.settings.showAttachments = COMBINED_DEFAULT_SETTINGS.showAttachments;
+        this.settings.existingFilesOnly = COMBINED_DEFAULT_SETTINGS.existingFilesOnly;
+        this.settings.showOrphans = COMBINED_DEFAULT_SETTINGS.showOrphans;
+        this.settings.graphGroups = [];
         this.settings.showTags = COMBINED_DEFAULT_SETTINGS.showTags;
         this.settings.showArrows = COMBINED_DEFAULT_SETTINGS.showArrows;
         this.settings.showParticleAnimation = COMBINED_DEFAULT_SETTINGS.showParticleAnimation;

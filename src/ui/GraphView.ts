@@ -13,6 +13,7 @@ export class BetterGraphView extends ItemView {
     nodes: GraphNode[] = [];
     links: GraphLink[] = [];
     container: HTMLElement;
+    private loadVersion = 0;
 
     filters = {
         showTags: false,
@@ -58,11 +59,11 @@ export class BetterGraphView extends ItemView {
         const graphContainer = mainContainer.createDiv('graph-container');
         
         // Create control panel container
-        const controlPanelContainer = mainContainer.createDiv('graph-control-panel');
-        controlPanelContainer.toggleClass('is-hidden', true); // Start hidden
+        const controlPanelContainer = mainContainer.createDiv('graph-control-panel graph-controls');
+        controlPanelContainer.toggleClass('is-hidden', false);
         
         // Create control toggle button
-        const controlToggle = mainContainer.createDiv('graph-control-toggle');
+        const controlToggle = mainContainer.createEl('button', { cls: 'graph-control-toggle clickable-icon is-hidden', attr: { 'aria-label': 'Open graph controls' } });
         setIcon(controlToggle, 'settings');
         
         // Helper to toggle visibility
@@ -84,28 +85,29 @@ export class BetterGraphView extends ItemView {
         
         // Create close button inside panel
         const controlHeader = controlPanelContainer.createDiv('graph-control-header');
-        const filterTitle = controlHeader.createDiv('graph-control-title');
-        filterTitle.createSpan({ text: 'Settings' });
+
         
         const actionsContainer = controlHeader.createDiv('graph-control-actions');
 
-        const resetButton = actionsContainer.createDiv('graph-control-close');
+        const resetButton = actionsContainer.createEl('button', { cls: 'graph-control-close clickable-icon', attr: { 'aria-label': 'Restore default settings' } });
         setIcon(resetButton, 'reset');
         resetButton.onclick = async (e) => {
             e.stopPropagation();
             // Reset all graph settings to defaults
             await this.plugin.resetGraphSettings();
             // Re-render controls to reflect default values
+            this.controls.destroy();
+            this.filters.searchQuery = '';
             this.controls = new GraphControls(controlsContent, this.plugin, this);
-            // Refresh the graph with new settings
             if (this.renderer) {
-                this.renderer.updateForces();
-                this.renderer.updateNodeSize(this.plugin.settings.nodeSize);
-                this.renderer.updateLinkThickness(this.plugin.settings.defaultLinkThickness);
+                this.renderer.toggleArrows(this.plugin.settings.showArrows);
+                this.renderer.toggleParticleAnimation(this.plugin.settings.showParticleAnimation);
+                await this.renderer.searchFileContents('');
+                await this.refresh();
             }
         };
         
-        const closeX = actionsContainer.createDiv('graph-control-close');
+        const closeX = actionsContainer.createEl('button', { cls: 'graph-control-close clickable-icon', attr: { 'aria-label': 'Close graph controls' } });
         setIcon(closeX, 'x');
         
         closeX.onclick = (e) => {
@@ -128,14 +130,18 @@ export class BetterGraphView extends ItemView {
     }
     
 async loadGraphData() {
+    const version = ++this.loadVersion;
+    const embeddings = await this.plugin.getGraphEmbeddings();
+    if (version !== this.loadVersion) return;
     const files = this.app.vault.getMarkdownFiles();
+    const allFiles = this.app.vault.getFiles();
     const nodeMap = new Map<string, GraphNode>();
     const tagNodes = new Map<string, GraphNode>();
     const tagConnectionCount = new Map<string, number>();
     
     // Create nodes for files
     for (const file of files) {
-        const embedding = await this.plugin.getEmbeddingLocally(file.path);
+        const embedding = embeddings[file.path];
         const fileStatus = this.plugin.embeddingService.getFileStatus(file);
         
         nodeMap.set(file.path, {
@@ -146,7 +152,7 @@ async loadGraphData() {
             y: 0,
             vx: 0,
             vy: 0,
-            embedding: embedding || undefined,
+            embedding: Array.isArray(embedding) ? embedding : undefined,
             type: 'file' as const,
             status: fileStatus
         });
@@ -214,15 +220,17 @@ async loadGraphData() {
         });
     });
     
-    // Combine all nodes
-    this.nodes = [...Array.from(nodeMap.values()), ...Array.from(tagNodes.values())];
-    console.debug('Total nodes:', this.nodes.length, 'Tag nodes:', tagNodes.size);
-    // Create links
+    if (version !== this.loadVersion) return;
+    // Keep attachment nodes in memory so toggling does not reload or recompute embeddings.
+    for (const file of allFiles) {
+        if (file.extension !== 'md') nodeMap.set(file.path, {
+            id: file.path, path: file.path, name: file.name, type: 'attachment'
+        });
+    }
     this.links = [];
-    
-    // Create traditional markdown [[links]] (always)
-    this.createTraditionalLinks(files, nodeMap);
-    
+    this.createTraditionalLinks(allFiles, nodeMap);
+    this.nodes = [...nodeMap.values(), ...tagNodes.values()];
+
     // Create embedding-based similarity links (if enabled)
     if (this.plugin.settings.useEmbeddings && this.nodes.some(n => n.embedding)) {
         this.createEmbeddingBasedLinks(nodeMap);
@@ -378,24 +386,31 @@ createTagLinks(files: TFile[], nodeMap: Map<string, GraphNode>, tagNodes: Map<st
     }
 
     createTraditionalLinks(files: TFile[], nodeMap: Map<string, GraphNode>) {
-        files.forEach(file => {
+        const seen = new Set<string>();
+        for (const file of files) {
             const cache = this.app.metadataCache.getFileCache(file);
-            if (cache?.links) {
-                cache.links.forEach(link => {
-                    const targetFile = this.app.metadataCache.getFirstLinkpathDest(link.link, file.path);
-                    if (targetFile && nodeMap.has(targetFile.path)) {
-                        const linkId = `${file.path}->${targetFile.path}`;
-                        this.links.push({
-                            source: file.path,
-                            target: targetFile.path,
-                            id: linkId,
-                            type: 'manual-link' as const,  // Mark as manual link to render as solid line
-                            thickness: this.plugin.settings.defaultLinkThickness
-                        });
-                    }
-                });
+            const resolved = this.app.metadataCache.resolvedLinks?.[file.path];
+            // Use the same resolved index as the native graph (includes embeds and properties).
+            const targets = new Set<string>(Object.keys(resolved ?? {}));
+            for (const link of [...(cache?.links ?? []), ...(cache?.embeds ?? []), ...(cache?.frontmatterLinks ?? [])]) {
+                const target = this.app.metadataCache.getFirstLinkpathDest(link.link, file.path);
+                if (target) targets.add(target.path);
+                else {
+                    const path = link.link.split('#')[0];
+                    if (!path) continue;
+                    const targetId = `unresolved:${path}`;
+                    nodeMap.set(targetId, { id: targetId, name: path.split('/').pop()!, path, type: 'unresolved' });
+                    targets.add(targetId);
+                }
             }
-        });
+            for (const targetId of targets) {
+                if (!targetId || !nodeMap.has(targetId)) continue;
+                const id = `${file.path}->${targetId}`;
+                if (seen.has(id)) continue;
+                seen.add(id);
+                this.links.push({ source: file.path, target: targetId, id, type: 'manual-link', thickness: this.plugin.settings.defaultLinkThickness });
+            }
+        }
     }
 
     calculateThicknessFromSimilarity(similarity: number): number {
@@ -417,6 +432,8 @@ createTagLinks(files: TFile[], nodeMap: Map<string, GraphNode>, tagNodes: Map<st
     }
 
     async onClose() {
+        this.loadVersion++;
+        this.controls?.destroy();
         if (this.renderer) {
             this.renderer.destroy();
         }

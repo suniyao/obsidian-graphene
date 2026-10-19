@@ -10,7 +10,7 @@ export interface BetterGraphSettings {
     // pineconeApiKey: string;
     // pineconeEnvironment: string;
     // pineconeIndexName: string;
-    
+
     // Embedding Settings
     useEmbeddings: boolean;
     similarityThreshold: number;
@@ -24,7 +24,9 @@ export interface BetterGraphSettings {
     // Ollama settings
     ollamaEndpoint?: string;
     ollamaModel?: string;
-    
+
+    graphGroups?: { query: string; color: string }[];
+
     // Graph Display
     nodeSize: number;
     linkDistance: number;
@@ -34,7 +36,7 @@ export interface BetterGraphSettings {
     showArrows: boolean; // Added
     textFadeThreshold: number; // Added
     showParticleAnimation: boolean; // Added
-    
+
     // Filters
     showTags: boolean; // Added
     showAttachments: boolean; // Added
@@ -56,7 +58,7 @@ export const DEFAULT_SETTINGS: BetterGraphSettings = {
     // pineconeApiKey: '',
     // pineconeEnvironment: '',
     // pineconeIndexName: '',
-    
+
     // Embedding Settings
     useEmbeddings: true,
     similarityThreshold: 0.6,
@@ -69,33 +71,33 @@ export const DEFAULT_SETTINGS: BetterGraphSettings = {
     embeddingProvider: 'ollama',
     ollamaEndpoint: 'http://localhost:11434',
     ollamaModel: 'nomic-embed-text',
-    
+
     // Graph Display - Updated physics values
     showTags: false,       // Added default
     showArrows: false,     // Added default
     showParticleAnimation: true, // Added default
-    
+
     textFadeThreshold: 0, // Normalized: -1 to 1, where 0 = 1.5 actual zoom level
     nodeSize: 6,
     defaultLinkThickness: 0.5,
     dottedLinkThickness: 1.25,
     dottedLinkSpacing: 1.2, // Normalized spacing multiplier (1 = default, higher = more spread out)
-    
-    // forces
-    centerForce: 0.7,     
-    repulsionForce: 100,  
-    linkForce: 0.05,        // Added default
-    linkDistance: 100,    
 
-    
+    // forces
+    centerForce: 4, // Native center strength 0.1 in the stored layout units
+    repulsionForce: 1000, // Native slider 10 cubed
+    linkForce: 1,        // Added default
+    linkDistance: 250,
+
+
     // Link Appearance
     minLinkThickness: 0.5,
     maxLinkThickness: 8,
     linkThickness: {},
-    
+
     // legacy
     showAttachments: false, // Added default
-    existingFilesOnly: true, // Added default
+    existingFilesOnly: false, // Added default
     showOrphans: true,     // Added default
 };
 
@@ -112,7 +114,7 @@ export interface GraphNode extends d3.SimulationNodeDatum {
     fy?: number | null;
     embedding?: number[];
     hidden?: boolean;
-    type?: 'file' | 'tag' | 'attachment';
+    type?: 'file' | 'tag' | 'attachment' | 'unresolved';
     connectionCount?: number;  // Add this for tag sizing
     status?: 'up-to-date' | 'modified' | 'new' | 'processing'; // Add this
 }

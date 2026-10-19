@@ -107,5 +107,16 @@ For hot reloading during development, install [Hot Reload](https://github.com/pj
 
 [GPL-3.0](LICENSE)
 
+
+### Native-style graph controls
+
+Graphene uses the native graph's zoom response, square-root node and label scaling, logarithmic text fading, and screen-space link thickness. Display sliders use multipliers (`1` is the default); force controls use the native ranges and response curves. Existing saved force settings are converted for display without changing their underlying values. Reset restores the new graph defaults without deleting cached embeddings or changing the similarity threshold.
+
+The panel contains Filters, Groups, Display, Forces, and Embeddings. Filters include tags, attachments, unresolved links, and orphans. Search matches file names, paths, and contents. Color groups match plain text in file names or paths; the first matching group wins. Search and groups do not implement Obsidian's advanced search-query syntax.
+
+The Embeddings section controls semantic links, similarity threshold, links per note (`0` means uncapped), adaptive pruning, and particle appearance. Dotted semantic connections remain distinct from solid explicit links. These controls use locally cached embeddings; changing display options does not regenerate vectors.
+
+Run `npm test` for layout, zoom/display, filter/link, and semantic-link checks. Run `npm run build` to update the installed plugin bundle.
+
 ## Contribution
 prototype by [suniyao](https://github.com/suniyao/) and [sanika-n](https://github.com/sanika-n) at [pair '25](https://pair.camp/) :) ❤️
