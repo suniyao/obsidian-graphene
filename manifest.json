@@ -1,6 +1,6 @@
 {
-	"id": "obsidian-graphene",
-	"name": "Graphene (dev)",
+	"id": "graphene",
+	"name": "Graphene",
 	"version": "1.3.0",
 	"minAppVersion": "0.15.0",
 	"description": "Creates a semantic graph based on content similarity using vector embeddings.",
