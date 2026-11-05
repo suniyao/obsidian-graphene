@@ -17,6 +17,7 @@ export interface BetterGraphSettings {
     embeddingWordLimit: number;
     embeddingWordSkip?: number; // number of initial words to skip (for skipping format/template text)
     excludeHeadingsFromEmbedding?: boolean; // if true, don't include markdown headings in embedding text
+    embedTitlesOnly?: boolean; // if true, embed only the note title instead of its content
     maxSimilarLinksPerNode?: number; // cap number of similarity links originating from a node
     dynamicSimilarityPruning?: boolean; // use per-node distribution to prune weak links
     // Embedding provider: 'openai' | 'ollama'
@@ -65,6 +66,7 @@ export const DEFAULT_SETTINGS: BetterGraphSettings = {
     embeddingWordLimit: 100,
     embeddingWordSkip: 20,
     excludeHeadingsFromEmbedding: true,
+    embedTitlesOnly: false,
     maxSimilarLinksPerNode: 10,
     dynamicSimilarityPruning: true,
     // Embedding provider defaults

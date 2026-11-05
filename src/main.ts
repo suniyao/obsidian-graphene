@@ -291,8 +291,10 @@ updateEmbeddingStatusUI(): void {
                 try {
                     const content = await this.app.vault.read(file);
                     
-                    // Extract only headings and first N words
-                    const cleanContent = this.embeddingService.cleanTextForEmbedding(content);
+                    // Extract only headings and first N words, or just the title if configured
+                    const cleanContent = this.settings.embedTitlesOnly
+                        ? file.basename
+                        : this.embeddingService.cleanTextForEmbedding(content);
                     
                     if (cleanContent.trim()) {
                         // Show token savings
@@ -307,7 +309,9 @@ updateEmbeddingStatusUI(): void {
                         // Store metadata about what was embedded
                         const metadata = {
                             embeddedAt: new Date().toISOString(),
-                            method: `headings-and-first-${this.settings.embeddingWordLimit}-words`,
+                            method: this.settings.embedTitlesOnly
+                                ? 'title-only'
+                                : `headings-and-first-${this.settings.embeddingWordLimit}-words`,
                             textLength: cleanContent.length
                         };
                         await this.storeEmbeddingMetadata(file.path, metadata);

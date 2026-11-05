@@ -8,6 +8,7 @@ export class EmbeddingService {
     private ollamaModel: string;
     private embeddingWordSkip: number;
     private excludeHeadingsFromEmbedding: boolean;
+    private embedTitlesOnly: boolean;
     public embeddingCache: EmbeddingCache;
     private app: App;
 
@@ -18,6 +19,7 @@ export class EmbeddingService {
         this.ollamaModel = settings.ollamaModel || 'nomic-embed-text';
         this.embeddingWordSkip = settings.embeddingWordSkip || 0;
         this.excludeHeadingsFromEmbedding = settings.excludeHeadingsFromEmbedding ?? true;
+        this.embedTitlesOnly = settings.embedTitlesOnly ?? false;
         this.app = app;
         this.embeddingCache = {
             version: '1.0.0',
@@ -41,6 +43,7 @@ export class EmbeddingService {
         this.ollamaModel = settings.ollamaModel || this.ollamaModel;
         this.embeddingWordSkip = settings.embeddingWordSkip || 0;
         this.excludeHeadingsFromEmbedding = settings.excludeHeadingsFromEmbedding ?? true;
+        this.embedTitlesOnly = settings.embedTitlesOnly ?? false;
     }
 
     async loadCache(): Promise<void> {
@@ -134,7 +137,73 @@ export class EmbeddingService {
         
         let processed = 0;
         let failed = 0;
-        
+
+        // When embedding titles only with Ollama, embed in batches of 64
+        if (this.embedTitlesOnly && this.embeddingProvider === 'ollama') {
+            const BATCH_SIZE = 64;
+
+            for (let i = 0; i < needsUpdate.length; i += BATCH_SIZE) {
+                const batch = needsUpdate.slice(i, i + BATCH_SIZE);
+
+                // Mark batch as processing
+                for (const file of batch) {
+                    this.embeddingCache.files[file.path] = {
+                        path: file.path,
+                        lastModified: file.stat.mtime,
+                        embeddingGenerated: Date.now(),
+                        status: 'processing'
+                    };
+                }
+                if (onStatusUpdate) onStatusUpdate();
+
+                const inputs = batch.map(file => file.basename);
+
+                try {
+                    const embeddings = await this.getOllamaEmbeddings(inputs);
+
+                    for (let j = 0; j < batch.length; j++) {
+                        const file = batch[j];
+                        const embedding = embeddings[j];
+
+                        if (embedding && embedding.length > 0) {
+                            this.embeddingCache.embeddings[file.path] = embedding;
+                            this.embeddingCache.files[file.path].status = 'up-to-date';
+                            this.embeddingCache.files[file.path].embeddingGenerated = Date.now();
+                            processed++;
+                        } else {
+                            console.warn(`[Embedding] Empty embedding returned for ${file.path}`);
+                            this.embeddingCache.files[file.path].status = 'modified';
+                            failed++;
+                        }
+
+                        if (onProgress) {
+                            onProgress(processed + failed, needsUpdate.length, file.basename);
+                        }
+                    }
+                } catch (error) {
+                    console.error(`Failed to generate embeddings for batch starting at ${i}:`, error);
+                    failed += batch.length;
+                    for (const file of batch) {
+                        this.embeddingCache.files[file.path].status = 'modified';
+                    }
+                }
+
+                await this.saveCache();
+                if (onStatusUpdate) onStatusUpdate();
+
+                // Rate limiting between batches
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+
+            await this.saveCache();
+            if (onStatusUpdate) onStatusUpdate();
+
+            const batchMessage = `Embeddings: ${processed} successful, ${failed} failed`;
+            new Notice(batchMessage);
+            console.debug(`[Embedding] Complete: ${batchMessage}`);
+            return;
+        }
+
         for (const file of needsUpdate) {
             // Update status to processing
             this.embeddingCache.files[file.path] = {
@@ -148,7 +217,9 @@ export class EmbeddingService {
             
             try {
                 const content = await this.app.vault.read(file);
-                const cleanedText = this.extractHeadingsAndFirstWords(content);
+                const cleanedText = this.embedTitlesOnly
+                    ? file.basename
+                    : this.extractHeadingsAndFirstWords(content);
                 
                 console.debug(`[Embedding] Processing ${file.path}, text length: ${cleanedText.length}`);
                 
@@ -253,6 +324,43 @@ export class EmbeddingService {
                 throw new Error('Cannot connect to Ollama. Make sure Ollama is running (ollama serve)');
             }
             console.error('Ollama embedding error:', error);
+            throw error;
+        }
+    }
+
+    private async getOllamaEmbeddings(inputs: string[]): Promise<number[][]> {
+        try {
+            const response = await requestUrl({
+                url: `${this.ollamaEndpoint}/api/embed`,
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    model: this.ollamaModel,
+                    input: inputs
+                })
+            });
+
+            if (response.status !== 200) {
+                throw new Error(`Ollama error: ${response.status} - ${response.text}`);
+            }
+
+            const data = response.json;
+            if (!data || !Array.isArray(data.embeddings)) {
+                throw new Error('Ollama returned invalid response - make sure the model is pulled');
+            }
+
+            // Normalize each vector to unit length
+            return (data.embeddings as number[][]).map(vec => {
+                let norm = 0;
+                for (const v of vec) norm += v * v;
+                norm = Math.sqrt(norm) || 1;
+                return vec.map(v => v / norm);
+            });
+        } catch (error) {
+            if (error instanceof Error && error.message.includes('ECONNREFUSED')) {
+                throw new Error('Cannot connect to Ollama. Make sure Ollama is running (ollama serve)');
+            }
+            console.error('Ollama batch embedding error:', error);
             throw error;
         }
     }

@@ -127,8 +127,22 @@ export class CombinedSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
+            .setName('Embed titles only')
+            .setDesc('Generate embeddings from note titles only, ignoring their content.')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.embedTitlesOnly ?? false)
+                .onChange(async (value) => {
+                    this.plugin.settings.embedTitlesOnly = value;
+                    await this.plugin.saveSettings();
+                    // Refresh to gray out / re-enable the content-based options
+                    this.display();
+                }));
+        const titlesOnly = this.plugin.settings.embedTitlesOnly ?? false;
+
+        new Setting(containerEl)
             .setName('Exclude headings from embedding')
             .setDesc('If enabled, markdown headings are not included in embedding text (reduces format-based similarity).') // /skip
+            .setDisabled(titlesOnly)
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.excludeHeadingsFromEmbedding ?? true)
                 .onChange(async (value) => {
@@ -139,6 +153,7 @@ export class CombinedSettingTab extends PluginSettingTab {
         new Setting(containerEl)
             .setName('Skip initial words')
             .setDesc('Number of words to skip at the beginning (useful for skipping template/format text)')
+            .setDisabled(titlesOnly)
             .addSlider(slider => slider
                 .setLimits(0, 200, 10)
                 .setValue(this.plugin.settings.embeddingWordSkip || 0)
@@ -151,6 +166,7 @@ export class CombinedSettingTab extends PluginSettingTab {
         new Setting(containerEl)
             .setName('Word limit for embeddings')
             .setDesc('Number of words to include from document body (after skipping initial words)')
+            .setDisabled(titlesOnly)
             .addSlider(slider => slider
                 .setLimits(50, 500, 50)
                 .setValue(this.plugin.settings.embeddingWordLimit)
