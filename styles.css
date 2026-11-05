@@ -313,3 +313,8 @@
     width: 100%;
     margin-top: 8px;
 }
+/* Grayed-out settings when "Embed titles only" is enabled */
+.setting-item.is-disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
