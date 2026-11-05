@@ -138,9 +138,9 @@ export class EmbeddingService {
         let processed = 0;
         let failed = 0;
 
-        // When embedding titles only with Ollama, embed in batches of 32
+        // When embedding titles only with Ollama, embed in batches of 64
         if (this.embedTitlesOnly && this.embeddingProvider === 'ollama') {
-            const BATCH_SIZE = 32;
+            const BATCH_SIZE = 64;
 
             for (let i = 0; i < needsUpdate.length; i += BATCH_SIZE) {
                 const batch = needsUpdate.slice(i, i + BATCH_SIZE);
